@@ -1,6 +1,6 @@
 # Google OAuth Integration Guide
 
-This guide explains how to set up Google OAuth authentication in your GodLove API application.
+This guide explains how to set up Google OAuth authentication in your SHARINGO API application.
 
 ## Prerequisites
 

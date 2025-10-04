@@ -30,14 +30,14 @@ export class GeneralService {
         newSelfStory: Object.values(NewSelfStory),
       },
       customer_support: {
-        title: 'GodLove Support',
+        title: 'Sharingo Support',
         description: 'We are here to help you with any issues or questions you may have.',
-        email: 'support@godlove.com',
+        email: 'support@sharingo.com',
         phone: '+1234567890',
         whatsapp: '+1234567890',
       },
       constants: {
-        appName: 'GodLove API',
+        appName: 'Sharingo API',
         version: '1.0.0',
         environment: process.env.NODE_ENV || 'development',
       },

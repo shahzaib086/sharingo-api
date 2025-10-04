@@ -2,7 +2,7 @@
 
 ## Initial Setup
 
-1. Create a PostgreSQL database named `db_godlove`
+1. Create a PostgreSQL database named `db_sharingo`
 2. Update your `.env` file with the database credentials
 3. Run the application to create tables automatically
 

@@ -74,7 +74,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
-DB_POOL=db_godlove
+DB_POOL=db_sharingo
 
 # Application
 PORT=3000

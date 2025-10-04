@@ -50,7 +50,7 @@ export class FaqSeeder {
       },
       {
         question: 'How can I contact support?',
-        answer: 'You can contact our support team through the contact form on our website or by sending an email to support@godlove.com. We typically respond within 24 hours.',
+        answer: 'You can contact our support team through the contact form on our website or by sending an email to support@sharingo.com. We typically respond within 24 hours.',
         sequence: 7,
         isActive: true,
       },

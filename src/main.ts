@@ -21,8 +21,8 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Godlove API')
-    .setDescription('API documentation for Godlove project')
+    .setTitle('Sharingo API')
+    .setDescription('API documentation for Sharingo project')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
