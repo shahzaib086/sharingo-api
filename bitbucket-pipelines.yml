@@ -1,0 +1,9 @@
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Deploy to dev
+          image: atlassian/default-image:2
+          script:
+            - ssh "$SSH_USER@$SSH_SERVER" "bash deploy.sh"
+  
