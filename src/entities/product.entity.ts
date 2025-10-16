@@ -6,7 +6,6 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
-  OneToMany,
 } from 'typeorm';
 
 @Entity('products')
@@ -62,9 +61,6 @@ export class Product {
 
   @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
   averageRating: number;
-
-  @OneToMany('ProductRating', 'product')
-  ratings: any[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -3,10 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { GeneralController } from './general.controller';
 import { GeneralService } from './general.service';
 import { Faq } from '../entities/faq.entity';
-import { Question } from '../entities/question.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Faq, Question])],
+  imports: [TypeOrmModule.forFeature([Faq])],
   controllers: [GeneralController],
   providers: [GeneralService],
   exports: [GeneralService],

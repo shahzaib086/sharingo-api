@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { GetProductsDto } from './dto/get-products.dto';
-import { SubmitReviewDto } from './dto/submit-review.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { DefaultResponseDto } from '@common/dto';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -71,32 +70,4 @@ export class ProductsController {
     );
   }
 
-  @Post('review')
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Submit product review' })
-  async submitReview(
-    @Request() req: any,
-    @Body() submitReviewDto: SubmitReviewDto,
-  ) {
-    const userId = req.user.id;
-    const review = await this.productsService.submitReview(userId, submitReviewDto);
-    
-    return new DefaultResponseDto(
-      'Review submitted successfully',
-      true,
-      review,
-    );
-  }
-
-  @Get(':id/reviews')
-  @ApiOperation({ summary: 'Get product reviews and average rating' })
-  async getProductReviews(@Param('id') id: string) {
-    const reviews = await this.productsService.getProductReviews(+id);
-    return new DefaultResponseDto(
-      'Product reviews retrieved successfully',
-      true,
-      reviews,
-    );
-  }
 } 

@@ -1,6 +1,6 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength, IsBoolean, IsEnum, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Gender, RelationshipStatus } from '@common/enums';
+import { Gender, OnboardingStep } from '@common/enums';
 
 export class UpdateUserDto {
     @ApiProperty({ example: 'John', required: false })
@@ -16,6 +16,12 @@ export class UpdateUserDto {
     @MaxLength(50)
     @IsOptional()
     lastName?: string;
+
+    @ApiProperty({ example: 'John Doe', required: false })
+    @IsString()
+    @MaxLength(100)
+    @IsOptional()
+    name?: string;
 
     @ApiProperty({ example: 'Pakistan', required: false })
     @IsString()
@@ -39,18 +45,49 @@ export class UpdateUserDto {
     @IsString()
     @MaxLength(20)
     @IsOptional()
-    gender?: Gender;
+    gender?: string;
 
-    @ApiProperty({ example: 'single', required: false })
-    @IsString()
-    @MaxLength(20)
-    @IsOptional()
-    relationshipStatus?: RelationshipStatus;
-
-    @ApiProperty({ example: 'book1,book2,book3', required: false })
+    @ApiProperty({ example: 'Street 1, Block A', required: false })
     @IsString()
     @MaxLength(255)
     @IsOptional()
-    books?: string;
+    addressLine1?: string;
 
+    @ApiProperty({ example: 'Near Shopping Mall', required: false })
+    @IsString()
+    @MaxLength(255)
+    @IsOptional()
+    addressLine2?: string;
+
+    @ApiProperty({ example: 1, required: false, enum: OnboardingStep })
+    @IsEnum(OnboardingStep)
+    @IsOptional()
+    onboardingStep?: OnboardingStep;
+
+    @ApiProperty({ example: 1, required: false })
+    @IsNumber()
+    @IsOptional()
+    status?: number;
+
+    @ApiProperty({ example: 'profile-image-url', required: false })
+    @IsString()
+    @MaxLength(255)
+    @IsOptional()
+    image?: string;
+
+    @ApiProperty({ example: 'fcm-token-string', required: false })
+    @IsString()
+    @MaxLength(255)
+    @IsOptional()
+    fcmToken?: string;
+
+    @ApiProperty({ example: 24.8607, required: false })
+    @IsNumber()
+    @IsOptional()
+    latitude?: number;
+
+    @ApiProperty({ example: 67.0011, required: false })
+    @IsNumber()
+    @IsOptional()
+    longitude?: number;
 }

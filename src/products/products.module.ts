@@ -6,13 +6,11 @@ import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
-import { ProductRating } from '../entities/product-rating.entity';
-import { Favourite } from '../entities/favourite.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, ProductCategory, ProductRating, Favourite]),
+    TypeOrmModule.forFeature([Product, ProductCategory]),
     AuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

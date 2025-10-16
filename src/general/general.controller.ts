@@ -22,10 +22,4 @@ export class GeneralController {
     return new DefaultResponseDto('FAQs fetched successfully', true, response);
   }
 
-  @Get('questions')
-  async getQuestions() {
-    const response = await this.generalService.getQuestionsByGroup()
-    return new DefaultResponseDto('Questions by group fetched successfully', true, response);
-  }
-
 }

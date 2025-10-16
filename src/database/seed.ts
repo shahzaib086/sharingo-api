@@ -3,15 +3,7 @@ import { DataSource } from 'typeorm';
 import { DatabaseSeeder } from './seeders';
 import { User } from '../entities/user.entity';
 import { Faq } from '../entities/faq.entity';
-import { Question } from '../entities/question.entity';
-import { Content } from '../entities/content.entity';
-import { Video } from '../entities/video.entity';
-import { VideoCategory } from '../entities/video-category.entity';
-import { UserVideoHistory } from '../entities/user-video-history.entity';
-import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
-import { ProductRating } from '../entities/product-rating.entity';
-import { Favourite } from '../entities/favourite.entity';
 
 // Load environment variables from .env file
 config();
@@ -23,8 +15,8 @@ async function seed() {
     port: parseInt(process.env.DB_PORT || '3306'),
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'root',
-    database: process.env.DB_POOL || 'godlove_db',
-    entities: [User, Faq, Question, Content, Video, VideoCategory, UserVideoHistory, Product, ProductCategory, ProductRating, Favourite],
+    database: process.env.DB_POOL || 'sharingo_db',
+    entities: [User, Faq, ProductCategory],
     synchronize: false, // Don't auto-sync in production
     logging: false,
   });

@@ -26,8 +26,6 @@ type SignInData = {
   email: string;
   firstName: string;
   lastName: string;
-  country_code: string;
-  phone_number: string;
 };
 
 type AuthResponse = {
@@ -90,8 +88,6 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      country_code: user.countryCode,
-      phone_number: user.phoneNumber,
     };
 
     return signInData;
@@ -141,7 +137,6 @@ export class AuthService {
           googleId: payload.sub,
           googlePicture: payload.picture,
           isEmailVerified: payload.email_verified,
-          isPhoneVerified: true, // Google users are considered verified
           password: '',
         });
       }
@@ -151,8 +146,6 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
-        country_code: user.countryCode,
-        phone_number: user.phoneNumber,
       };
 
       return await this.signIn(signInData);
@@ -174,8 +167,8 @@ export class AuthService {
       firstName: signupInput.firstName,
       lastName: signupInput.lastName,
       email: signupInput.email,
-      countryCode: signupInput.countryCode,
-      phoneNumber: signupInput.phoneNumber,
+      // countryCode: signupInput.countryCode,
+      // phoneNumber: signupInput.phoneNumber,
       password: hashedPassword,
       otp,
       onboardingStep: OnboardingStep.ACCOUNT_CREATION,
@@ -199,7 +192,7 @@ export class AuthService {
       throw new BadRequestException('Invalid OTP or userId');
     }
     await this.usersService.update(user.id, {
-      isPhoneVerified: true,
+      isEmailVerified: true,
       otp: undefined,
       onboardingStep: OnboardingStep.OTP_VERIFICATION,
     });
@@ -209,8 +202,6 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      country_code: user.countryCode,
-      phone_number: user.phoneNumber,
     };
 
     return await this.signIn(signInData);

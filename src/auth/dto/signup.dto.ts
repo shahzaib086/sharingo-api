@@ -19,15 +19,15 @@ export class SignupDto {
   @MaxLength(100)
   email: string;
 
-  @ApiProperty({ example: '+1' })
-  @IsString()
-  @MaxLength(10)
-  countryCode: string;
+  // @ApiProperty({ example: '+1' })
+  // @IsString()
+  // @MaxLength(10)
+  // countryCode: string;
 
-  @ApiProperty({ example: '+1234567890' })
-  @IsString()
-  @MaxLength(20)
-  phoneNumber: string;
+  // @ApiProperty({ example: '+1234567890' })
+  // @IsString()
+  // @MaxLength(20)
+  // phoneNumber: string;
 
   @ApiProperty({ example: 'password' })
   @IsString()

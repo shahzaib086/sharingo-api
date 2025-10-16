@@ -48,7 +48,7 @@ export class AuthController {
   async signup(@Body() signupInput: SignupDto) {
     const response = await this.authService.signup(signupInput);
     return new DefaultResponseDto(
-      'Verification code sent to phone number',
+      'Verification code sent to email',
       true,
       response,
     );

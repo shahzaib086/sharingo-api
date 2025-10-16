@@ -6,10 +6,7 @@ import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { DefaultResponseDto } from '@common/dto';
-import { ApiBearerAuth, ApiConsumes, ApiBody, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { SelectQuestionsDto } from './dto/select-questions.dto';
-import { SaveFavouriteDto } from './dto/save-favourite.dto';
-import { GetFavouritesDto } from './dto/get-favourites.dto';
+import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
@@ -87,49 +84,9 @@ export class UsersController {
     );
   }
 
-  @Patch('update-questions-selection')
-  async updateQuestionsSelection(@Request() req: any, @Body() selectQuestionsDto: SelectQuestionsDto) { 
-    const userId = req.user.id;
-    const updatedUser = await this.usersService.updateQuestionsSelection(userId, selectQuestionsDto);
-    return new DefaultResponseDto('Questions selection updated successfully', true, updatedUser);
-  }
-
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(+id);
   }
 
-  @Post('favourites')
-  @ApiOperation({ summary: 'Favourite or unfavourite a video/product' })
-  async saveFavourite(
-    @Request() req: any,
-    @Body() saveFavouriteDto: SaveFavouriteDto,
-  ) {
-    const userId = req.user.id;
-    const result = await this.usersService.saveFavourite(userId, saveFavouriteDto);
-    
-    const action = saveFavouriteDto.action === 'favourite' ? 'favourited' : 'unfavourited';
-    return new DefaultResponseDto(
-      `Item ${action} successfully`,
-      true,
-      result,
-    );
-  }
-
-  @Get('favourites')
-  @ApiOperation({ summary: 'Get user favourites by type' })
-  @ApiQuery({ name: 'type', required: true, enum: ['video', 'product'], description: 'Type of favourites to retrieve' })
-  async getFavourites(
-    @Request() req: any,
-    @Query() getFavouritesDto: GetFavouritesDto,
-  ) {
-    const userId = req.user.id;
-    const favourites = await this.usersService.getFavourites(userId, getFavouritesDto);
-    
-    return new DefaultResponseDto(
-      'Favourites retrieved successfully',
-      true,
-      favourites,
-    );
-  }
 }

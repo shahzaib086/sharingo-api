@@ -13,43 +13,63 @@ export class ProductCategorySeeder {
 
       const categories = [
         {
-          name: 'Fiction',
-          description: 'Fictional literature and novels',
+          name: 'Electronics',
+          description: 'Electronic devices and gadgets',
           status: 1,
         },
         {
-          name: 'Non-Fiction',
-          description: 'Non-fictional books and educational content',
+          name: 'Home Appliances',
+          description: 'Home and household appliances',
           status: 1,
         },
         {
-          name: 'Science & Technology',
-          description: 'Books about science, technology, and innovation',
+          name: 'Books',
+          description: 'Books and literature',
           status: 1,
         },
         {
-          name: 'Business & Finance',
-          description: 'Business, finance, and management books',
+          name: 'Kitchen',
+          description: 'Kitchen tools and equipment',
           status: 1,
         },
         {
-          name: 'Self-Help',
-          description: 'Personal development and self-help books',
+          name: 'Garden',
+          description: 'Garden tools and outdoor equipment',
           status: 1,
         },
         {
-          name: 'Biography & Memoir',
-          description: 'Biographies and personal memoirs',
+          name: 'Computer',
+          description: 'Computer hardware and accessories',
           status: 1,
         },
         {
-          name: 'History',
-          description: 'Historical books and accounts',
+          name: 'Food',
+          description: 'Food items and beverages',
           status: 1,
         },
         {
-          name: 'Philosophy',
-          description: 'Philosophical works and theories',
+          name: 'Clothing',
+          description: 'Clothing and fashion items',
+          status: 1,
+        },
+        {
+          name: 'Sports',
+          description: 'Sports equipment and gear',
+          status: 1,
+        },
+        {
+          name: 'Beauty',
+          description: 'Beauty and personal care products',
+          status: 1,
+        },
+        {
+          name: 'Toys',
+          description: 'Toys and games',
+          status: 1,
+        },
+        {
+          name: 'Automotive',
+          description: 'Automotive parts and accessories',
           status: 1,
         },
       ];
