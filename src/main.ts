@@ -8,6 +8,18 @@ import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // Enable CORS
+  app.enableCors({
+    origin: ['http://localhost:5173', 'http://localhost:3000'], // Allow your frontend and any other origins you need
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true, // Allow cookies and authorization headers
+  });
+  
+  // Set global prefix for all routes
+  app.setGlobalPrefix('api');
+  
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ 
     whitelist: true,
