@@ -6,11 +6,12 @@ import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
+import { ProductMedia } from '../entities/product-media.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, ProductCategory]),
+    TypeOrmModule.forFeature([Product, ProductCategory, ProductMedia]),
     AuthModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

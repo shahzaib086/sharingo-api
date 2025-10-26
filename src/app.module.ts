@@ -9,6 +9,7 @@ import { GeneralModule } from './general/general.module';
 import { ContentModule } from './content/content.module';
 import { ProductsModule } from './products/products.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AddressesModule } from './addresses/addresses.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -24,6 +25,7 @@ import configuration from './config/configuration';
     ContentModule,
     ProductsModule,
     NotificationsModule,
+    AddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

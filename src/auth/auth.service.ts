@@ -28,9 +28,16 @@ type SignInData = {
   lastName: string;
 };
 
-type AuthResponse = {
+type AuthUserResponse = {
   id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+type AuthResponse = {
   accessToken: string;
+  user: AuthUserResponse;
 };
 
 type GoogleUserInfo = {
@@ -97,7 +104,12 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(user);
     return {
       accessToken,
-      id: user.id,
+      user: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+      }
     };
   }
 

@@ -5,8 +5,13 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  OneToMany,
   JoinColumn,
 } from 'typeorm';
+import { Address } from './address.entity';
+import { ProductMedia } from './product-media.entity';
+import { ProductCategory } from './product-category.entity';
+import { User } from './user.entity';
 
 @Entity('products')
 export class Product {
@@ -16,51 +21,47 @@ export class Product {
   @Column({ length: 255 })
   name: string;
 
-  @Column({ length: 255 })
-  author: string;
-
-  @Column({ type: 'date', nullable: true })
-  publishedDate: Date;
-
-  @Column({ length: 100, nullable: true })
-  publisher: string;
-
-  @Column({ type: 'int', default: 0 })
-  pages: number;
-
-  @Column({ length: 20, nullable: true })
-  language: string;
-
-  @Column({ length: 20, nullable: true })
-  format: string;
-
-  @Column({ length: 30, nullable: true })
-  isbn: string;
+  @Column({ length: 255, unique: true, nullable: true })
+  nameSlug: string;
 
   @Column()
   categoryId: number;
 
   @ManyToOne('ProductCategory', { eager: true })
   @JoinColumn({ name: 'categoryId' })
-  category: any;
+  category: ProductCategory;
+
+  @Column({ nullable: true })
+  addressId: number;
+
+  @ManyToOne('Address', { eager: true })
+  @JoinColumn({ name: 'addressId' })
+  address: Address;
+
+  @Column()
+  userId: number;
+
+  @ManyToOne('User', { eager: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   price: number;
-
-  @Column({ length: 255, nullable: true })
-  image: string;
-
-  @Column({ type: 'int', default: 0 })
-  inventory: number;
 
   @Column({ type: 'text', nullable: true })
   description: string;
 
   @Column({ default: 1 })
   status: number;
+  
+  @Column({ type: 'int', default: 0 })
+  views: number;
 
-  @Column({ type: 'decimal', precision: 3, scale: 2, default: 0 })
-  averageRating: number;
+  @Column({ type: 'varchar', nullable: true })
+  tags: string;
+
+  @OneToMany('ProductMedia', 'product')
+  media: ProductMedia[];
 
   @CreateDateColumn()
   createdAt: Date;

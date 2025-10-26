@@ -4,8 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
 import { OnboardingStep } from '../common/enums/user.enum';
+import { Address } from './address.entity';
 
 @Entity('users')
 export class User {
@@ -52,21 +54,6 @@ export class User {
   @Column({ default: false })
   isGoogle: boolean;
 
-  @Column({ length: 255, nullable: true })
-  addressLine1: string;
-
-  @Column({ length: 255, nullable: true })
-  addressLine2: string;
-
-  @Column({ length: 50, nullable: true })
-  country: string;
-
-  @Column({ length: 50, nullable: true })
-  city: string;
-
-  @Column({ length: 10, nullable: true })
-  postalCode: string;
-
   @Column({ length: 20, nullable: true })
   gender: string;
 
@@ -82,11 +69,8 @@ export class User {
   @Column({ length: 255, nullable: true })
   fcmToken: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
-  latitude: number;
-
-  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
-  longitude: number;
+  @OneToMany('Address', 'user')
+  addresses: Address[];
 
   @CreateDateColumn()
   createdAt: Date;
