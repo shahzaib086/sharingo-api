@@ -5,13 +5,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
-import { ProductMedia } from '../entities/product-media.entity';
+import { ProductMedia, MediaType } from '../entities/product-media.entity';
 import { GetProductsDto } from './dto/get-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
-import { MediaType } from '../entities/product-media.entity';
-
+import { ProductStatus } from '@common/enums';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -23,7 +22,7 @@ export class ProductsService {
     private readonly productMediaRepository: Repository<ProductMedia>,
   ) {}
 
-  async getProducts(getProductsDto: GetProductsDto, userId?: number): Promise<{ products: any[], total: number, page: number, limit: number, totalPages: number }> {
+  async getProducts(getProductsDto: GetProductsDto, userId?: number): Promise<{ counts: { active: number, completed: number }, products: any[], total: number, page: number, limit: number, totalPages: number }> {
     const { categoryId, searchKeywords, page = 1, limit = 10 } = getProductsDto;
     
     const queryBuilder = this.productsRepository
@@ -46,7 +45,11 @@ export class ProductsService {
         'category.id',
         'category.name'
       ])
-      .where('product.status = :status', { status: 1 });
+      .where('product.status IN (:...status)', { status: [ProductStatus.ACTIVE, ProductStatus.COMPLETED] });
+
+    if (userId) {
+      queryBuilder.andWhere('product.userId = :userId', { userId });
+    }
 
     if (categoryId) {
       queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId });
@@ -92,8 +95,16 @@ export class ProductsService {
     }));
     
     const totalPages = Math.ceil(total / limit);
+
+    const completedCounts = await this.productsRepository.count({ where: { userId, status: ProductStatus.COMPLETED } });
+    const activeCounts = await this.productsRepository.count({ where: { userId, status: ProductStatus.ACTIVE } });
+    const counts = {
+      active: activeCounts,
+      completed: completedCounts,
+    }
     
     return {
+      counts,
       products: productsWithMedia,
       total,
       page,
@@ -138,7 +149,7 @@ export class ProductsService {
         'user.image'
       ])
       .where('product.id = :id', { id })
-      .andWhere('product.status = :status', { status: 1 })
+      .andWhere('product.status IN (:...status)', { status: [ProductStatus.ACTIVE, ProductStatus.COMPLETED] })
       .getOne();
 
     if (!product) {
@@ -179,13 +190,37 @@ export class ProductsService {
   // Helper function to generate unique slug
   private async generateUniqueSlug(baseSlug: string): Promise<string> {
     let slug = baseSlug;
-    let counter = 1;
     
-    while (await this.productsRepository.findOne({ where: { nameSlug: slug } })) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
+    // Check if base slug exists (including soft-deleted), if not return it
+    const existingProduct = await this.productsRepository.findOne({ 
+      where: { nameSlug: slug },
+      withDeleted: true,
+    });
+    if (!existingProduct) {
+      return slug;
     }
     
+    // If slug exists, generate a random 6-digit number and append it
+    let attempts = 0;
+    const maxAttempts = 100; // Prevent infinite loop
+    
+    while (attempts < maxAttempts) {
+      const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit number (100000-999999)
+      slug = `${baseSlug}-${randomNumber}`;
+      
+      const existing = await this.productsRepository.findOne({ 
+        where: { nameSlug: slug },
+        withDeleted: true,
+      });
+      if (!existing) {
+        return slug;
+      }
+      
+      attempts++;
+    }
+    
+    // Fallback: use timestamp if all attempts fail (should be very rare)
+    slug = `${baseSlug}-${Date.now()}`;
     return slug;
   }
 
@@ -199,14 +234,18 @@ export class ProductsService {
       nameSlug: uniqueSlug,
       price: createProductDto.price ?? 0,
       views: 0,
-      status: createProductDto.status ?? 1,
+      status: createProductDto.status ?? ProductStatus.ACTIVE,
     });
 
     return await this.productsRepository.save(product);
   }
 
   async update(id: number, updateProductDto: UpdateProductDto, userId: number): Promise<Product> {
-    const product = await this.productsRepository.findOne({ where: { id } });
+    // Find product only if it belongs to the logged-in user
+    const product = await this.productsRepository.findOne({ 
+      where: { id, userId },
+      withDeleted: false,
+    });
 
     if (!product) {
       throw new NotFoundException('Product not found');
@@ -263,6 +302,43 @@ export class ProductsService {
     await this.productMediaRepository.remove(media);
   }
 
+  async deleteProductMediaByProductAndMediaId(productId: number, mediaId: number, userId: number): Promise<void> {
+    // First verify the product exists and belongs to the user
+    const product = await this.productsRepository.findOne({ 
+      where: { id: productId, userId },
+      withDeleted: false,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Verify the media exists and belongs to the product
+    const media = await this.productMediaRepository.findOne({ 
+      where: { id: mediaId, productId },
+    });
+
+    if (!media) {
+      throw new NotFoundException('Product media not found');
+    }
+
+    // Delete the physical file if it exists
+    if (media.mediaUrl && media.mediaUrl.startsWith('/uploads/')) {
+      const filePath = path.join(process.cwd(), media.mediaUrl);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (error) {
+          // Log error but continue with database deletion
+          console.error(`Failed to delete file: ${filePath}`, error);
+        }
+      }
+    }
+
+    // Delete the media record from database
+    await this.productMediaRepository.remove(media);
+  }
+
   async uploadProductImage(
     productId: number,
     file: Express.Multer.File,
@@ -313,6 +389,25 @@ export class ProductsService {
     });
 
     return await this.productMediaRepository.save(productMedia);
+  }
+
+  async softDelete(id: number, userId: number): Promise<void> {
+    const product = await this.productsRepository.findOne({ 
+      where: { id, userId },
+      withDeleted: false,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Verify ownership before soft delete
+    if (product.userId !== userId) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Soft delete the product
+    await this.productsRepository.softRemove(product);
   }
 
 } 

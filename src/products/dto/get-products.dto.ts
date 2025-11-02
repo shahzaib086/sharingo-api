@@ -14,7 +14,7 @@ export class GetProductsDto {
   categoryId?: number;
 
   @ApiPropertyOptional({ 
-    description: 'Search keywords for name, author, description, publisher, and ISBN',
+    description: 'Search keywords for name, description, tags',
     // example: '',
     type: String 
   })

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Body, UseGuards, Request, Patch, Delete, UnauthorizedException, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, UseGuards, Request, Patch, Delete, UnauthorizedException, UploadedFile, UseInterceptors, NotFoundException, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { GetProductsDto } from './dto/get-products.dto';
@@ -15,13 +15,19 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get products with optional filters and pagination' })
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Get products with optional filters and pagination (returns only logged in user products)' })
   @ApiQuery({ name: 'categoryId', required: false, type: Number })
   @ApiQuery({ name: 'searchKeywords', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of products per page (default: 10)' })
   async getProducts(@Query() getProductsDto: GetProductsDto, @Request() req: any) {
-    const userId = req.user?.id;
+    if (!req.user || !req.user.id) {
+      throw new UnauthorizedException('User not authenticated or user ID missing');
+    }
+    
+    const userId = req.user.id;
     const products = await this.productsService.getProducts(getProductsDto, userId);
     return new DefaultResponseDto(
       'Products retrieved successfully',
@@ -42,28 +48,24 @@ export class ProductsController {
   }
 
   @Get(':id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Get product details by ID' })
   @ApiParam({ name: 'id', type: Number })
   async getProductById(@Param('id') id: string, @Request() req: any) {
     const productId = parseInt(id);
     
     if (isNaN(productId)) {
-      return new DefaultResponseDto(
-        'Invalid product ID',
-        false,
-        null,
+      throw new BadRequestException(
+        'Invalid product ID'
       );
     }
 
-    const userId = req.user?.id;
+    const userId = req.user.id;
     const product = await this.productsService.getProductById(productId, userId);
     
     if (!product) {
-      return new DefaultResponseDto(
-        'Product not found',
-        false,
-        null,
-      );
+      throw new NotFoundException('Product not found');
     }
 
     return new DefaultResponseDto(
@@ -78,11 +80,10 @@ export class ProductsController {
   @UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Create a new product' })
   async create(@Body() createProductDto: CreateProductDto, @Request() req: any) {
-    if (!req.user || !req.user.id) {
+    const userId = req?.user?.id;
+    if (!userId) {
       throw new UnauthorizedException('User not authenticated or user ID missing');
     }
-    
-    const userId = req.user.id;
     const product = await this.productsService.create(createProductDto, userId);
     return new DefaultResponseDto(
       'Product created successfully',
@@ -198,6 +199,49 @@ export class ProductsController {
     );
   }
 
+  @Delete(':productId/media/:mediaId')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Remove product image using product ID and media ID' })
+  @ApiParam({ name: 'productId', type: Number, description: 'Product ID' })
+  @ApiParam({ name: 'mediaId', type: Number, description: 'Media ID' })
+  async deleteProductImage(
+    @Param('productId') productId: string,
+    @Param('mediaId') mediaId: string,
+    @Request() req: any,
+  ) {
+    const prodId = parseInt(productId);
+    const medId = parseInt(mediaId);
+    
+    if (isNaN(prodId)) {
+      return new DefaultResponseDto(
+        'Invalid product ID',
+        false,
+        null,
+      );
+    }
+
+    if (isNaN(medId)) {
+      return new DefaultResponseDto(
+        'Invalid media ID',
+        false,
+        null,
+      );
+    }
+
+    if (!req.user || !req.user.id) {
+      throw new UnauthorizedException('User not authenticated or user ID missing');
+    }
+
+    const userId = req.user.id;
+    await this.productsService.deleteProductMediaByProductAndMediaId(prodId, medId, userId);
+    return new DefaultResponseDto(
+      'Product image deleted successfully',
+      true,
+      null,
+    );
+  }
+
   @Delete('media/:mediaId')
   @ApiBearerAuth()
   @UseGuards(AuthGuard)
@@ -218,6 +262,35 @@ export class ProductsController {
     await this.productsService.deleteProductMedia(id, userId);
     return new DefaultResponseDto(
       'Product media deleted successfully',
+      true,
+      null,
+    );
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Soft delete a product' })
+  @ApiParam({ name: 'id', type: Number })
+  async deleteProduct(@Param('id') id: string, @Request() req: any) {
+    const productId = parseInt(id);
+    
+    if (isNaN(productId)) {
+      return new DefaultResponseDto(
+        'Invalid product ID',
+        false,
+        null,
+      );
+    }
+
+    if (!req.user || !req.user.id) {
+      throw new UnauthorizedException('User not authenticated or user ID missing');
+    }
+
+    const userId = req.user.id;
+    await this.productsService.softDelete(productId, userId);
+    return new DefaultResponseDto(
+      'Product deleted successfully',
       true,
       null,
     );
