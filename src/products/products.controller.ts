@@ -2,6 +2,7 @@ import { Controller, Get, Post, Param, Query, Body, UseGuards, Request, Patch, D
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { GetProductsDto } from './dto/get-products.dto';
+import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
@@ -33,6 +34,26 @@ export class ProductsController {
       'Products retrieved successfully',
       true,
       products,
+    );
+  }
+
+  @Get('public')
+  @ApiOperation({ 
+    summary: 'Get public product listing (no authentication required)',
+    description: 'Returns a paginated list of active products with optional filters for category, price range, and search keywords. Sorted by createdAt DESC by default.'
+  })
+  @ApiQuery({ name: 'categoryId', required: false, type: Number, description: 'Filter by category ID' })
+  @ApiQuery({ name: 'searchKeywords', required: false, type: String, description: 'Search in name, description, tags' })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number, description: 'Minimum price filter' })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number, description: 'Maximum price filter' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  async getPublicProducts(@Query() getPublicProductsDto: GetPublicProductsDto) {
+    const result = await this.productsService.getPublicProducts(getPublicProductsDto);
+    return new DefaultResponseDto(
+      'Public products retrieved successfully',
+      true,
+      result,
     );
   }
 

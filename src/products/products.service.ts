@@ -7,6 +7,7 @@ import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia, MediaType } from '../entities/product-media.entity';
 import { GetProductsDto } from './dto/get-products.dto';
+import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
@@ -165,6 +166,126 @@ export class ProductsService {
     return {
       ...product,
       media
+    };
+  }
+
+  async getPublicProducts(
+    getPublicProductsDto: GetPublicProductsDto,
+  ): Promise<{
+    products: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const {
+      categoryId,
+      searchKeywords,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 20,
+    } = getPublicProductsDto;
+
+    const queryBuilder = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.user', 'user')
+      .leftJoinAndSelect('product.address', 'address')
+      .select([
+        'product.id',
+        'product.name',
+        'product.nameSlug',
+        'product.categoryId',
+        'product.addressId',
+        'product.price',
+        'product.description',
+        'product.views',
+        'product.tags',
+        'product.createdAt',
+        'product.updatedAt',
+        'category.id',
+        'category.name',
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.image',
+        'address.id',
+        'address.address1',
+        'address.address2',
+        'address.city',
+        'address.state',
+        'address.country',
+        'address.zipcode',
+      ])
+      .where('product.status = :status', { status: ProductStatus.ACTIVE })
+      .orderBy('product.createdAt', 'DESC');
+
+    // Apply category filter
+    if (categoryId) {
+      queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+
+    // Apply search keywords filter
+    if (searchKeywords) {
+      queryBuilder.andWhere(
+        '(product.name ILIKE :searchKeywords OR product.description ILIKE :searchKeywords OR product.tags ILIKE :searchKeywords)',
+        { searchKeywords: `%${searchKeywords}%` },
+      );
+    }
+
+    // Apply price range filters
+    if (minPrice !== undefined) {
+      queryBuilder.andWhere('product.price >= :minPrice', { minPrice });
+    }
+
+    if (maxPrice !== undefined) {
+      queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice });
+    }
+
+    // Get total count for pagination
+    const total = await queryBuilder.getCount();
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    queryBuilder.skip(skip).take(limit);
+
+    const products = await queryBuilder.getMany();
+
+    // Fetch media for all products in one query
+    const productIds = products.map((p) => p.id);
+    const allMedia =
+      productIds.length > 0
+        ? await this.productMediaRepository
+            .createQueryBuilder('media')
+            .where('media.productId IN (:...productIds)', { productIds })
+            .orderBy('media.sequence', 'ASC')
+            .getMany()
+        : [];
+
+    // Group media by productId
+    const mediaByProduct = allMedia.reduce((acc, media) => {
+      if (!acc[media.productId]) {
+        acc[media.productId] = [];
+      }
+      acc[media.productId].push(media);
+      return acc;
+    }, {} as Record<number, ProductMedia[]>);
+
+    // Add media to each product
+    const productsWithMedia = products.map((product) => ({
+      ...product,
+      media: mediaByProduct[product.id] || [],
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      products: productsWithMedia,
+      total,
+      page,
+      limit,
+      totalPages,
     };
   }
 

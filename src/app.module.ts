@@ -10,6 +10,7 @@ import { ContentModule } from './content/content.module';
 import { ProductsModule } from './products/products.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AddressesModule } from './addresses/addresses.module';
+import { ChatModule } from './chat/chat.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -26,6 +27,7 @@ import configuration from './config/configuration';
     ProductsModule,
     NotificationsModule,
     AddressesModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
