@@ -57,6 +57,26 @@ export class ProductsController {
     );
   }
 
+  @Get('public/:identifier')
+  @ApiOperation({ 
+    summary: 'Get product details by slug or ID (no authentication required)',
+    description: 'Returns detailed product information including images, address, and user details. Accepts either product ID or slug.'
+  })
+  @ApiParam({ name: 'identifier', type: String, description: 'Product ID or slug' })
+  async getPublicProductDetails(@Param('identifier') identifier: string) {
+    const product = await this.productsService.getProductBySlugOrId(identifier);
+    
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return new DefaultResponseDto(
+      'Product details retrieved successfully',
+      true,
+      product,
+    );
+  }
+
   @Get('categories')
   @ApiOperation({ summary: 'Get product categories' })
   async getProductCategories() {

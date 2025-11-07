@@ -169,6 +169,70 @@ export class ProductsService {
     };
   }
 
+  async getProductBySlugOrId(identifier: string): Promise<Product | null> {
+    const queryBuilder = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.address', 'address')
+      .leftJoinAndSelect('product.user', 'user')
+      .select([
+        'product.id',
+        'product.name',
+        'product.nameSlug',
+        'product.categoryId',
+        'product.addressId',
+        'product.userId',
+        'product.price',
+        'product.description',
+        'product.status',
+        'product.views',
+        'product.tags',
+        'product.createdAt',
+        'product.updatedAt',
+        'category.id',
+        'category.name',
+        'address.id',
+        'address.address1',
+        'address.address2',
+        'address.city',
+        'address.state',
+        'address.country',
+        'address.zipcode',
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.createdAt'
+      ])
+      .andWhere('product.status = :status', { status: ProductStatus.ACTIVE });
+
+    // Check if identifier is a number (ID) or string (slug)
+    const numericId = parseInt(identifier);
+    if (!isNaN(numericId) && numericId.toString() === identifier) {
+      // It's a numeric ID
+      queryBuilder.where('product.id = :id', { id: numericId });
+    } else {
+      // It's a slug
+      queryBuilder.where('product.nameSlug = :slug', { slug: identifier });
+    }
+
+    const product = await queryBuilder.getOne();
+
+    if (!product) {
+      return null;
+    }
+
+    // Fetch media for the product
+    const media = await this.productMediaRepository.find({
+      where: { productId: product.id },
+      order: { sequence: 'ASC' },
+    });
+
+    return {
+      ...product,
+      media
+    };
+  }
+
   async getPublicProducts(
     getPublicProductsDto: GetPublicProductsDto,
   ): Promise<{
