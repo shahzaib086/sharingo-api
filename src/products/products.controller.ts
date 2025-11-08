@@ -5,7 +5,7 @@ import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { UpdateProductImagesDto } from './dto/update-product-images.dto';
+import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { DefaultResponseDto } from '../common/dto';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
@@ -88,6 +88,42 @@ export class ProductsController {
     );
   }
 
+  @Patch(':id/status')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Update product status',
+    description: 'Updates the status of a product. Only the product owner can update the status.'
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Product ID' })
+  async updateProductStatus(
+    @Param('id') id: string,
+    @Body() updateProductStatusDto: UpdateProductStatusDto,
+    @Request() req: any,
+  ) {
+    const productId = Number.parseInt(id);
+    
+    if (Number.isNaN(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
+
+    if (!req?.user?.id) {
+      throw new UnauthorizedException('User not authenticated or user ID missing');
+    }
+
+    const product = await this.productsService.updateProductStatus(
+      productId,
+      updateProductStatusDto.status,
+      req?.user?.id,
+    );
+
+    return new DefaultResponseDto(
+      'Product status updated successfully',
+      true,
+      product,
+    );
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @UseGuards(AuthGuard)
@@ -166,9 +202,11 @@ export class ProductsController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard)
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload product image/file' })
+  @ApiOperation({ 
+    summary: 'Upload product image/file',
+    description: 'Upload an image or video file for a product. Sequence number is automatically assigned based on existing media (incremental).'
+  })
   @ApiParam({ name: 'id', type: Number, description: 'Product ID' })
-  @ApiQuery({ name: 'sequence', required: false, type: Number, description: 'Media sequence/order (default: 0)' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -186,12 +224,11 @@ export class ProductsController {
   async uploadProductFile(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
-    @Query('sequence') sequence: string,
     @Request() req: any,
   ) {
-    const productId = parseInt(id);
+    const productId = Number.parseInt(id);
     
-    if (isNaN(productId)) {
+    if (Number.isNaN(productId)) {
       return new DefaultResponseDto(
         'Invalid product ID',
         false,
@@ -208,9 +245,8 @@ export class ProductsController {
     }
 
     const userId = req.user.id;
-    const seq = sequence ? parseInt(sequence) : 0;
     
-    const media = await this.productsService.uploadProductImage(productId, file, seq, userId);
+    const media = await this.productsService.uploadProductImage(productId, file, userId);
     return new DefaultResponseDto(
       'File uploaded successfully',
       true,

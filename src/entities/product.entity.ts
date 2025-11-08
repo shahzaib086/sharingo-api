@@ -61,6 +61,9 @@ export class Product {
   @Column({ type: 'varchar', nullable: true })
   tags: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  image: string | null;
+
   @OneToMany('ProductMedia', 'product')
   media: ProductMedia[];
 

@@ -73,8 +73,34 @@ curl -X POST http://localhost:3000/users \
 6. Add your callback URL (e.g., `http://localhost:3000/auth/google-login`)
 7. Copy the Client ID and Client Secret to your `.env` file 
 
+## Manual Migrations
+
+If you need to run manual database migrations (e.g., for schema updates), execute the SQL files in the `src/database/migrations/` directory:
+
+### Available Migrations:
+
+1. **create-chat-tables.sql** - Creates chats and messages tables
+2. **add-status-to-chats.sql** - Adds status column to chats table (1=ACTIVE, 2=INACTIVE)
+3. **add-image-to-products.sql** - Adds image column to products table (automatically synced with sequence 1 media)
+
+### Running Migrations:
+
+```bash
+# Connect to your PostgreSQL database
+psql -U your_username -d db_sharingo
+
+# Run a specific migration
+\i src/database/migrations/add-status-to-chats.sql
+
+# Or run all migrations in order
+\i src/database/migrations/create-chat-tables.sql
+\i src/database/migrations/add-status-to-chats.sql
+\i src/database/migrations/add-image-to-products.sql
+```
+
 ## Notes
 
 - The database will automatically create tables when you first run the application (synchronize is enabled in development)
 - In production, set `NODE_ENV=production` to disable auto-synchronization
-- SSL is automatically configured for production environments 
+- SSL is automatically configured for production environments
+- After updating entities, you may need to run corresponding SQL migrations for existing databases 

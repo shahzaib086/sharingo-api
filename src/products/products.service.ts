@@ -6,12 +6,13 @@ import * as path from 'path';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia, MediaType } from '../entities/product-media.entity';
+import { Chat } from '../entities/chat.entity';
 import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
-import { ProductStatus } from '@common/enums';
+import { ProductStatus, ChatStatus } from '@common/enums';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -21,6 +22,8 @@ export class ProductsService {
     private readonly productCategoriesRepository: Repository<ProductCategory>,
     @InjectRepository(ProductMedia)
     private readonly productMediaRepository: Repository<ProductMedia>,
+    @InjectRepository(Chat)
+    private readonly chatRepository: Repository<Chat>,
   ) {}
 
   async getProducts(getProductsDto: GetProductsDto, userId?: number): Promise<{ counts: { active: number, completed: number }, products: any[], total: number, page: number, limit: number, totalPages: number }> {
@@ -464,7 +467,15 @@ export class ProductsService {
       sequence: mediaData.sequence,
     });
 
-    return await this.productMediaRepository.save(productMedia);
+    const savedMedia = await this.productMediaRepository.save(productMedia);
+
+    // If sequence is 1, update the product's main image
+    if (mediaData.sequence === 1) {
+      product.image = mediaData.mediaUrl;
+      await this.productsRepository.save(product);
+    }
+
+    return savedMedia;
   }
 
   async getProductMedia(productId: number): Promise<ProductMedia[]> {
@@ -484,7 +495,30 @@ export class ProductsService {
       throw new NotFoundException('Product media not found');
     }
 
+    const productId = media.productId;
+    const wasSequenceOne = media.sequence === 1;
+
     await this.productMediaRepository.remove(media);
+
+    // If the deleted media was sequence 1, update product image
+    if (wasSequenceOne) {
+      const product = await this.productsRepository.findOne({ 
+        where: { id: productId },
+        withDeleted: false,
+      });
+
+      if (product) {
+        // Find the next available image (lowest sequence)
+        const nextImage = await this.productMediaRepository.findOne({
+          where: { productId },
+          order: { sequence: 'ASC' },
+        });
+
+        // Update product image to the next available image or null
+        product.image = nextImage ? nextImage.mediaUrl : null;
+        await this.productsRepository.save(product);
+      }
+    }
   }
 
   async deleteProductMediaByProductAndMediaId(productId: number, mediaId: number, userId: number): Promise<void> {
@@ -507,6 +541,8 @@ export class ProductsService {
       throw new NotFoundException('Product media not found');
     }
 
+    const wasSequenceOne = media.sequence === 1;
+
     // Delete the physical file if it exists
     if (media.mediaUrl && media.mediaUrl.startsWith('/uploads/')) {
       const filePath = path.join(process.cwd(), media.mediaUrl);
@@ -522,12 +558,24 @@ export class ProductsService {
 
     // Delete the media record from database
     await this.productMediaRepository.remove(media);
+
+    // If the deleted media was sequence 1, update product image
+    if (wasSequenceOne) {
+      // Find the next available image (lowest sequence)
+      const nextImage = await this.productMediaRepository.findOne({
+        where: { productId },
+        order: { sequence: 'ASC' },
+      });
+
+      // Update product image to the next available image or null
+      product.image = nextImage ? nextImage.mediaUrl : null;
+      await this.productsRepository.save(product);
+    }
   }
 
   async uploadProductImage(
     productId: number,
     file: Express.Multer.File,
-    sequence: number = 0,
     userId: number,
   ): Promise<ProductMedia> {
     const product = await this.productsRepository.findOne({ where: { id: productId } });
@@ -535,6 +583,15 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException('Product not found');
     }
+
+    // Get the highest sequence number for this product
+    const maxSequenceMedia = await this.productMediaRepository.findOne({
+      where: { productId },
+      order: { sequence: 'DESC' },
+    });
+
+    // Set sequence to max + 1, or 1 if no media exists
+    const sequence = maxSequenceMedia ? maxSequenceMedia.sequence + 1 : 1;
 
     // Create uploads/products directory if it doesn't exist
     const uploadDir = path.join(process.cwd(), 'uploads', 'products');
@@ -573,7 +630,15 @@ export class ProductsService {
       sequence,
     });
 
-    return await this.productMediaRepository.save(productMedia);
+    const savedMedia = await this.productMediaRepository.save(productMedia);
+
+    // If sequence is 1, update the product's main image
+    if (sequence === 1) {
+      product.image = mediaUrl;
+      await this.productsRepository.save(product);
+    }
+
+    return savedMedia;
   }
 
   async softDelete(id: number, userId: number): Promise<void> {
@@ -593,6 +658,39 @@ export class ProductsService {
 
     // Soft delete the product
     await this.productsRepository.softRemove(product);
+  }
+
+  async updateProductStatus(id: number, status: number, requestUserId: number): Promise<Product> {
+    // Find product
+    const product = await this.productsRepository.findOne({ 
+      where: { id },
+      withDeleted: false,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Verify the requesting user owns the product or is the user associated with the product
+    if (product.userId !== requestUserId) {
+      throw new NotFoundException('Product not found or you do not have permission to update this product');
+    }
+
+    // Update the status
+    product.status = status;
+    const updatedProduct = await this.productsRepository.save(product);
+
+    // If product status is changed to COMPLETED, mark all related chats as INACTIVE
+    if (status === ProductStatus.COMPLETED) {
+      await this.chatRepository
+        .createQueryBuilder()
+        .update(Chat)
+        .set({ status: ChatStatus.INACTIVE })
+        .where('productId = :productId', { productId: id })
+        .execute();
+    }
+
+    return updatedProduct;
   }
 
 } 

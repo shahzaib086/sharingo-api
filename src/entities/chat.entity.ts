@@ -12,6 +12,7 @@ import {
 import { User } from './user.entity';
 import { Product } from './product.entity';
 import { Message } from './message.entity';
+import { ChatStatus } from '../common/enums';
 
 @Entity('chats')
 @Index(['productId', 'userAId', 'userBId'], { unique: true })
@@ -51,6 +52,9 @@ export class Chat {
 
   @Column({ default: 0 })
   unreadCountUserB: number;
+
+  @Column({ default: ChatStatus.ACTIVE })
+  status: number;
 
   @OneToMany('Message', 'chat')
   messages: Message[];
