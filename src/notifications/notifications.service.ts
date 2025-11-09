@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification, NotificationModule } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
+import { UserToken } from '../entities/user-token.entity';
+import { FcmService } from './fcm.service';
 
 export interface CreateNotificationDto {
   userId: number;
@@ -20,6 +22,9 @@ export class NotificationsService {
     private readonly notificationRepository: Repository<Notification>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserToken)
+    private readonly userTokenRepository: Repository<UserToken>,
+    private readonly fcmService: FcmService,
   ) {}
 
   async createNotification(createNotificationDto: CreateNotificationDto): Promise<Notification> {
@@ -64,23 +69,205 @@ export class NotificationsService {
     });
   }
 
-  async updateFcmToken(userId: number, fcmToken: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new Error('User not found');
+  async updateFcmToken(userId: number | null, deviceId: string, fcmToken: string): Promise<UserToken> {
+    // Check if token already exists for this device
+    let userToken = await this.userTokenRepository.findOne({ 
+      where: { deviceId } 
+    });
+
+    if (userToken) {
+      // Update existing token
+      userToken.fcmToken = fcmToken;
+      if( userId ) {
+        userToken.userId = userId;
+      }
+    } else {
+      // Create new token
+      userToken = this.userTokenRepository.create({
+        deviceId,
+        fcmToken,
+        userId: userId || null,
+      });
     }
 
-    user.fcmToken = fcmToken;
-    return await this.userRepository.save(user);
+    return await this.userTokenRepository.save(userToken);
   }
 
-  async removeFcmToken(userId: number): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new Error('User not found');
+  async removeFcmToken(deviceId: string): Promise<void> {
+    const userToken = await this.userTokenRepository.findOne({ 
+      where: { deviceId } 
+    });
+
+    if (userToken) {
+      await this.userTokenRepository.remove(userToken);
+    }
+  }
+
+  async getUserTokensByUserId(userId: number): Promise<UserToken[]> {
+    return await this.userTokenRepository.find({
+      where: { userId },
+    });
+  }
+
+  async getAllActiveTokens(): Promise<UserToken[]> {
+    return await this.userTokenRepository.find();
+  }
+
+  async notifyAllUsersAboutNewProduct(
+    product: any,
+    productOwner: any,
+  ): Promise<{ created: number; failed: number }> {
+    try {
+      // Get all active users except the product owner
+      const activeUsers = await this.userRepository
+        .createQueryBuilder('user')
+        .select(['user.id', 'user.firstName', 'user.lastName'])
+        .where('user.status = :status', { status: 1 })
+        .andWhere('user.id != :ownerId', { ownerId: productOwner.id })
+        .getMany();
+
+      if (activeUsers.length === 0) {
+        return { created: 0, failed: 0 };
+      }
+
+      // Determine price text
+      const priceText = product.price === 0 || product.price === '0' 
+        ? 'for free' 
+        : `for $${product.price}`;
+
+      // Get location text if available
+      const locationText = product.address?.city 
+        ? ` in ${product.address.city}` 
+        : ' near you';
+
+      // Create notification title and message
+      const title = '🎉 New Product Posted!';
+      const message = `${productOwner.firstName || 'Someone'} posted ${product.name} ${priceText}${locationText}`;
+
+      // Create payload object
+      const payloadData = {
+        productId: product.id,
+        productName: product.name,
+        productSlug: product.nameSlug,
+        price: product.price,
+        categoryId: product.categoryId,
+        ownerId: productOwner.id,
+        ownerName: `${productOwner.firstName} ${productOwner.lastName}`.trim(),
+      };
+
+      // Prepare notifications for batch insert
+      const notifications = activeUsers.map(user => 
+        this.notificationRepository.create({
+          userId: user.id,
+          title,
+          message,
+          module: NotificationModule.PRODUCT,
+          resourceId: product.id,
+          payload: payloadData,
+          isRead: false,
+        })
+      );
+
+      // Batch insert notifications
+      let created = 0;
+      let failed = 0;
+
+      try {
+        const savedNotifications = await this.notificationRepository.save(notifications);
+        created = savedNotifications.length;
+
+        // Send push notifications to all users asynchronously (don't wait)
+        // Exclude the product owner
+        this.sendPushNotificationToAllUsers(
+          title,
+          message,
+          payloadData,
+          [productOwner.id], // Exclude product owner
+        ).catch(error => {
+          console.error('Error sending push notifications:', error);
+        });
+      } catch (error) {
+        console.error('Error creating notifications:', error);
+        failed = activeUsers.length;
+      }
+
+      return { created, failed };
+    } catch (error) {
+      console.error('Error in notifyAllUsersAboutNewProduct:', error);
+      return { created: 0, failed: 0 };
+    }
+  }
+
+  async notifyUsersAboutNewProductByLocation(
+    product: any,
+    productOwner: any,
+    maxDistanceKm?: number,
+  ): Promise<{ created: number; failed: number }> {
+    // Future enhancement: notify users based on location preferences
+    // For now, we'll use the simple notifyAllUsersAboutNewProduct
+    return this.notifyAllUsersAboutNewProduct(product, productOwner);
+  }
+
+  /**
+   * Send push notifications to specific users
+   */
+  private async sendPushNotificationsToUsers(
+    userIds: number[],
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ): Promise<void> {
+    if (!this.fcmService.isEnabled()) {
+      console.log('FCM not enabled, skipping push notifications');
+      return;
     }
 
-    user.fcmToken = '';
-    return await this.userRepository.save(user);
+    try {
+      // Get all FCM tokens for these users
+      const userTokens = await this.userTokenRepository
+        .createQueryBuilder('userToken')
+        .where('userToken.userId IN (:...userIds)', { userIds })
+        .getMany();
+
+      if (userTokens.length === 0) {
+        console.log('No FCM tokens found for users');
+        return;
+      }
+
+      const tokens = userTokens.map(t => t.fcmToken);
+
+      // Send push notifications
+      const result = await this.fcmService.sendToTokens(tokens, title, body, data);
+
+      console.log(
+        `Push notifications sent: ${result.successCount} success, ${result.failureCount} failed`,
+      );
+    } catch (error) {
+      console.error('Error sending push notifications to users:', error);
+    }
+  }
+
+  /**
+   * Send push notification to a single user
+   */
+  async sendPushNotificationToUser(
+    userId: number,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ): Promise<{ successCount: number; failureCount: number }> {
+    return this.fcmService.sendToUser(userId, title, body, data);
+  }
+
+  /**
+   * Send push notification to all users
+   */
+  async sendPushNotificationToAllUsers(
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+    excludeUserIds?: number[],
+  ): Promise<{ successCount: number; failureCount: number }> {
+    return this.fcmService.sendToAllUsers(title, body, data, excludeUserIds);
   }
 } 

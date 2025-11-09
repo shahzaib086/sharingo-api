@@ -77,6 +77,31 @@ export class ProductsController {
     );
   }
 
+  @Post('public/:identifier/view')
+  @ApiOperation({ 
+    summary: 'Increment product view count (no authentication required)',
+    description: 'Increments the view count for a product. This endpoint can be called when a user views product details. Product owner views are not counted. Authentication is optional.'
+  })
+  @ApiParam({ name: 'identifier', type: String, description: 'Product ID or slug' })
+  async incrementProductView(@Param('identifier') identifier: string, @Request() req: any) {
+    // Extract userId if user is authenticated (optional)
+    const viewerUserId = req?.user?.id;
+    
+    const result = await this.productsService.incrementProductView(identifier, viewerUserId);
+    
+    if (!result.found) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return new DefaultResponseDto(
+      result.incremented 
+        ? 'Product view count incremented successfully' 
+        : 'Product view not counted (owner view)',
+      true,
+      { id: result.productId, views: result.views, incremented: result.incremented },
+    );
+  }
+
   @Get('categories')
   @ApiOperation({ summary: 'Get product categories' })
   async getProductCategories() {

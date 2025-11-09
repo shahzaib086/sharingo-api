@@ -2,13 +2,15 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { FcmService } from './fcm.service';
 import { Notification } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
+import { UserToken } from '../entities/user-token.entity';
 import { JwtModule, JwtModuleOptions } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Notification, User]), JwtModule.registerAsync({
+  imports: [TypeOrmModule.forFeature([Notification, User, UserToken]), JwtModule.registerAsync({
     imports: [ConfigModule],
     inject: [ConfigService],
     useFactory: (configService: ConfigService): JwtModuleOptions => ({
@@ -18,7 +20,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
   })],
   controllers: [NotificationsController],
-  providers: [NotificationsService],
-  exports: [NotificationsService],
+  providers: [NotificationsService, FcmService],
+  exports: [NotificationsService, FcmService],
 })
 export class NotificationsModule {} 

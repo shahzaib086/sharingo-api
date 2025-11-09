@@ -45,6 +45,12 @@ lerna-debug.log*
 .env.production.local
 .env.local
 
+# Firebase credentials (IMPORTANT: Never commit these!)
+**/firebase-service-account*.json
+**/sharingo-*.json
+firebase-adminsdk-*.json
+config/firebase*.json
+
 # temp directory
 .temp
 .tmp

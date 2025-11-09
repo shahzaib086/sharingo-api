@@ -1,7 +1,7 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class UpdateFcmTokenDto {
+export class UpdateFcmTokenPublicDto {
   @ApiProperty({
     description: 'Unique device identifier',
     example: 'device-uuid-12345',
@@ -19,4 +19,15 @@ export class UpdateFcmTokenDto {
   @IsString()
   @IsNotEmpty()
   fcmToken: string;
-} 
+
+  @ApiProperty({
+    description: 'Optional user ID to associate with this device token',
+    example: 123,
+    type: Number,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  userId?: number;
+}
+

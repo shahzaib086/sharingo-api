@@ -8,12 +8,15 @@ import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia } from '../entities/product-media.entity';
 import { Chat } from '../entities/chat.entity';
+import { User } from '../entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, ProductCategory, ProductMedia, Chat]),
+    TypeOrmModule.forFeature([Product, ProductCategory, ProductMedia, Chat, User]),
     AuthModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

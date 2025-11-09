@@ -7,12 +7,14 @@ import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia, MediaType } from '../entities/product-media.entity';
 import { Chat } from '../entities/chat.entity';
+import { User } from '../entities/user.entity';
 import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
 import { ProductStatus, ChatStatus } from '@common/enums';
+import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class ProductsService {
   constructor(
@@ -24,6 +26,9 @@ export class ProductsService {
     private readonly productMediaRepository: Repository<ProductMedia>,
     @InjectRepository(Chat)
     private readonly chatRepository: Repository<Chat>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async getProducts(getProductsDto: GetProductsDto, userId?: number): Promise<{ counts: { active: number, completed: number }, products: any[], total: number, page: number, limit: number, totalPages: number }> {
@@ -425,7 +430,53 @@ export class ProductsService {
       status: createProductDto.status ?? ProductStatus.ACTIVE,
     });
 
-    return await this.productsRepository.save(product);
+    const savedProduct = await this.productsRepository.save(product);
+
+    // Send notifications to all active users asynchronously (don't await)
+    // Only if the product is ACTIVE
+    if (savedProduct.status === ProductStatus.ACTIVE) {
+      this.sendNewProductNotifications(savedProduct.id, userId).catch(error => {
+        console.error('Error sending new product notifications:', error);
+      });
+    }
+
+    return savedProduct;
+  }
+
+  private async sendNewProductNotifications(productId: number, userId: number): Promise<void> {
+    try {
+      // Fetch product with full details including category, address
+      const product = await this.productsRepository
+        .createQueryBuilder('product')
+        .leftJoinAndSelect('product.category', 'category')
+        .leftJoinAndSelect('product.address', 'address')
+        .where('product.id = :id', { id: productId })
+        .getOne();
+
+      if (!product) {
+        return;
+      }
+
+      // Fetch product owner details
+      const productOwner = await this.userRepository.findOne({
+        where: { id: userId },
+        select: ['id', 'firstName', 'lastName', 'email'],
+      });
+
+      if (!productOwner) {
+        return;
+      }
+
+      // Send notifications to all users
+      const result = await this.notificationsService.notifyAllUsersAboutNewProduct(
+        product,
+        productOwner,
+      );
+
+      console.log(`New product notifications sent: ${result.created} created, ${result.failed} failed`);
+    } catch (error) {
+      console.error('Error in sendNewProductNotifications:', error);
+    }
   }
 
   async update(id: number, updateProductDto: UpdateProductDto, userId: number): Promise<Product> {
@@ -691,6 +742,65 @@ export class ProductsService {
     }
 
     return updatedProduct;
+  }
+
+  async incrementProductView(
+    identifier: string, 
+    viewerUserId?: number
+  ): Promise<{ found: boolean; incremented: boolean; productId?: number; views?: number }> {
+    // Check if identifier is a number (ID) or string (slug)
+    const numericId = Number.parseInt(identifier);
+    let product: Product | null = null;
+
+    if (!Number.isNaN(numericId) && numericId.toString() === identifier) {
+      // It's a numeric ID
+      product = await this.productsRepository.findOne({
+        where: { id: numericId, status: ProductStatus.ACTIVE },
+        withDeleted: false,
+      });
+    } else {
+      // It's a slug
+      product = await this.productsRepository.findOne({
+        where: { nameSlug: identifier, status: ProductStatus.ACTIVE },
+        withDeleted: false,
+      });
+    }
+
+    if (!product) {
+      return { found: false, incremented: false };
+    }
+
+    // Check if the viewer is the product owner
+    // If viewerUserId is provided and matches the product owner, don't increment
+    if (viewerUserId && product.userId === viewerUserId) {
+      return { 
+        found: true, 
+        incremented: false, 
+        productId: product.id, 
+        views: product.views 
+      };
+    }
+
+    // Increment the view count using a direct database update for better performance
+    await this.productsRepository
+      .createQueryBuilder()
+      .update(Product)
+      .set({ views: () => 'views + 1' })
+      .where('id = :id', { id: product.id })
+      .execute();
+
+    // Fetch and return the updated product with the new view count
+    const updatedProduct = await this.productsRepository.findOne({
+      where: { id: product.id },
+      withDeleted: false,
+    });
+
+    return { 
+      found: true, 
+      incremented: true, 
+      productId: updatedProduct!.id, 
+      views: updatedProduct!.views 
+    };
   }
 
 } 
