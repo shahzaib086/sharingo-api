@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Notification, NotificationModule } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
 import { UserToken } from '../entities/user-token.entity';
+import { Product } from '../entities/product.entity';
 import { FcmService } from './fcm.service';
 
 export interface CreateNotificationDto {
@@ -24,6 +25,8 @@ export class NotificationsService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(UserToken)
     private readonly userTokenRepository: Repository<UserToken>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly fcmService: FcmService,
   ) {}
 
@@ -32,15 +35,63 @@ export class NotificationsService {
     return await this.notificationRepository.save(notification);
   }
 
-  async getNotificationsByUserId(userId: number, page: number = 1, limit: number = 10): Promise<{ notifications: Notification[]; total: number }> {
-    const [notifications, total] = await this.notificationRepository.findAndCount({
+  async getNotificationsByUserId(
+    userId: number, 
+    page: number = 1, 
+    limit: number = 10
+  ): Promise<{ 
+    notifications: any[]; 
+    total: number; 
+    page: number; 
+    limit: number; 
+    totalPages: number;
+  }> {
+    // Build query with product details
+    const queryBuilder = this.notificationRepository
+      .createQueryBuilder('notification')
+      .where('notification.userId = :userId', { userId })
+      .orderBy('notification.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // Get total count
+    const total = await this.notificationRepository.count({
       where: { userId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
-    return { notifications, total };
+    // Get notifications
+    const notifications = await queryBuilder.getMany();
+
+    // Fetch product details for notifications with product module
+    const notificationsWithProducts = await Promise.all(
+      notifications.map(async (notification) => {
+        let product: any = null;
+
+        // If notification is about a product, fetch product details
+        if (notification.module === 'product' && notification.resourceId) {
+          product = await this.productRepository
+            .createQueryBuilder('product')
+            .select(['product.id', 'product.name', 'product.nameSlug', 'product.image'])
+            .where('product.id = :productId', { productId: notification.resourceId })
+            .getOne();
+        }
+
+        return {
+          ...notification,
+          product,
+        };
+      })
+    );
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      notifications: notificationsWithProducts,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async markAsRead(notificationId: number, userId: number): Promise<Notification> {

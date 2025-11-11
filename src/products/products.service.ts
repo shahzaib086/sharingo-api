@@ -257,6 +257,7 @@ export class ProductsService {
       maxPrice,
       page = 1,
       limit = 20,
+      location,
     } = getPublicProductsDto;
 
     const queryBuilder = this.productsRepository
@@ -313,6 +314,10 @@ export class ProductsService {
 
     if (maxPrice !== undefined) {
       queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice });
+    }
+
+    if (location) {
+      queryBuilder.andWhere('address.city ILIKE :location OR address.state ILIKE :location', { location: `%${location}%` });
     }
 
     // Get total count for pagination

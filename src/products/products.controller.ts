@@ -48,6 +48,7 @@ export class ProductsController {
   @ApiQuery({ name: 'maxPrice', required: false, type: Number, description: 'Maximum price filter' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'location', required: false, type: String, description: 'Location string' })
   async getPublicProducts(@Query() getPublicProductsDto: GetPublicProductsDto) {
     const result = await this.productsService.getPublicProducts(getPublicProductsDto);
     return new DefaultResponseDto(

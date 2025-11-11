@@ -69,5 +69,16 @@ export class GetPublicProductsDto {
   @IsNumber()
   @Min(1)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ 
+    description: 'Location string',
+    example: '123 Main St, Anytown, USA',
+    type: String,
+    default: '',
+    minimum: 1
+  })
+  @IsOptional()
+  @IsString()
+  location?: string;
 }
 

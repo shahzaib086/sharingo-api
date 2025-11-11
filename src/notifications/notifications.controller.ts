@@ -24,7 +24,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Post('token/update')
+  @Post('token-update')
   @ApiOperation({ 
     summary: 'Update FCM token (Public - No authentication required)',
     description: 'Updates or creates an FCM token for a device. If deviceId already exists, updates the fcmToken and userId. Supports guest users when userId is not provided.'
