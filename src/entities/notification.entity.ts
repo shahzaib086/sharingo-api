@@ -13,6 +13,7 @@ export enum NotificationModule {
   ORDER = 'order',
   PRODUCT = 'product',
   VIDEO = 'video',
+  MESSAGE = 'message',
   GENERAL = 'general',
 }
 

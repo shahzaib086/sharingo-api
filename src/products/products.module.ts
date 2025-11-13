@@ -7,6 +7,7 @@ import { ProductsService } from './products.service';
 import { Product } from '../entities/product.entity';
 import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia } from '../entities/product-media.entity';
+import { ProductReport } from '../entities/product-report.entity';
 import { Chat } from '../entities/chat.entity';
 import { User } from '../entities/user.entity';
 import { AuthModule } from '../auth/auth.module';
@@ -14,7 +15,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Product, ProductCategory, ProductMedia, Chat, User]),
+    TypeOrmModule.forFeature([Product, ProductCategory, ProductMedia, ProductReport, Chat, User]),
     AuthModule,
     NotificationsModule,
     JwtModule.registerAsync({

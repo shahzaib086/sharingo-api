@@ -1,12 +1,13 @@
-import { Controller, Body, Patch, Param, Delete, UseGuards, UseInterceptors, UploadedFile, Request, Post, Get, Query } from '@nestjs/common';
+import { Controller, Body, Patch, Param, Delete, UseGuards, UseInterceptors, UploadedFile, Request, Get, UnauthorizedException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { DefaultResponseDto } from '@common/dto';
-import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiBody, ApiOperation } from '@nestjs/swagger';
 
 @ApiBearerAuth()
 @UseGuards(AuthGuard)
@@ -81,6 +82,49 @@ export class UsersController {
       'User updated successfully',
       true,
       updatedUser,
+    );
+  }
+
+  @Patch('profile')
+  @ApiOperation({
+    summary: 'Update logged-in user profile',
+    description: 'Updates the profile information of the logged-in user (firstName, lastName, phoneNumber, countryCode)',
+  })
+  async updateProfile(
+    @Request() req: any,
+    @Body() updateUserProfileDto: UpdateUserProfileDto,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const userId = req.user.id;
+    const updatedUser = await this.usersService.updateProfile(userId, updateUserProfileDto);
+
+    return new DefaultResponseDto(
+      'Profile updated successfully',
+      true,
+      updatedUser,
+    );
+  }
+
+  @Get('me')
+  @ApiOperation({
+    summary: 'Get logged-in user details with address',
+    description: 'Returns the logged-in user details along with their default address or first address if no default is set',
+  })
+  async getUserProfile(@Request() req: any) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const userId = req.user.id;
+    const userWithAddress = await this.usersService.getUserWithAddress(userId);
+
+    return new DefaultResponseDto(
+      'User details retrieved successfully',
+      true,
+      userWithAddress,
     );
   }
 

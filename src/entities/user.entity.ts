@@ -6,7 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
 } from 'typeorm';
-import { OnboardingStep } from '../common/enums/user.enum';
+import { OnboardingStep, UserRole } from '../common/enums/user.enum';
 import { Address } from './address.entity';
 
 @Entity('users')
@@ -25,6 +25,9 @@ export class User {
 
   @Column({ length: 100, unique: true })
   email: string;
+
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  role: UserRole;
 
   @Column({ length: 10, nullable: true })
   countryCode: string;

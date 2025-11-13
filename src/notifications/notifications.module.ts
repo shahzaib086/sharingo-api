@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { NotificationsGateway } from './notifications.gateway';
 import { FcmService } from './fcm.service';
 import { Notification } from '../entities/notification.entity';
 import { User } from '../entities/user.entity';
@@ -21,7 +22,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     }),
   })],
   controllers: [NotificationsController],
-  providers: [NotificationsService, FcmService],
-  exports: [NotificationsService, FcmService],
+  providers: [NotificationsService, NotificationsGateway, FcmService],
+  exports: [NotificationsService, NotificationsGateway, FcmService],
 })
 export class NotificationsModule {} 

@@ -9,6 +9,11 @@ export enum Gender {
   OTHER = 'other'
 }
 
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user',
+}
+
 export enum OnboardingStep {
   ACCOUNT_CREATION = 1,
   OTP_VERIFICATION = 2,

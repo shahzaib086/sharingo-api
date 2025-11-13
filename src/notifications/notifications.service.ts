@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, forwardRef, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification, NotificationModule } from '../entities/notification.entity';
@@ -6,6 +6,7 @@ import { User } from '../entities/user.entity';
 import { UserToken } from '../entities/user-token.entity';
 import { Product } from '../entities/product.entity';
 import { FcmService } from './fcm.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 export interface CreateNotificationDto {
   userId: number;
@@ -28,11 +29,25 @@ export class NotificationsService {
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
     private readonly fcmService: FcmService,
+    @Inject(forwardRef(() => NotificationsGateway))
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   async createNotification(createNotificationDto: CreateNotificationDto): Promise<Notification> {
     const notification = this.notificationRepository.create(createNotificationDto);
-    return await this.notificationRepository.save(notification);
+    const savedNotification = await this.notificationRepository.save(notification);
+    
+    // Emit WebSocket event to notify user of new notification
+    try {
+      this.notificationsGateway.emitNewNotification(
+        savedNotification.userId,
+        savedNotification,
+      );
+    } catch (error) {
+      console.error('Error emitting new notification event:', error);
+    }
+    
+    return savedNotification;
   }
 
   async getNotificationsByUserId(
@@ -104,7 +119,16 @@ export class NotificationsService {
     }
 
     notification.isRead = true;
-    return await this.notificationRepository.save(notification);
+    const savedNotification = await this.notificationRepository.save(notification);
+    
+    // Emit WebSocket event
+    try {
+      this.notificationsGateway.emitNotificationRead(userId, notificationId);
+    } catch (error) {
+      console.error('Error emitting notification read event:', error);
+    }
+    
+    return savedNotification;
   }
 
   async markAllAsRead(userId: number): Promise<void> {
@@ -112,6 +136,13 @@ export class NotificationsService {
       { userId, isRead: false },
       { isRead: true }
     );
+    
+    // Emit WebSocket event
+    try {
+      this.notificationsGateway.emitAllNotificationsRead(userId);
+    } catch (error) {
+      console.error('Error emitting all notifications read event:', error);
+    }
   }
 
   async getUnreadCount(userId: number): Promise<number> {

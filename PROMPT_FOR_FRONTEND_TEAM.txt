@@ -1,0 +1,147 @@
+📢 TASK: Implement Real-Time Notifications with WebSocket
+
+Hi Frontend Team,
+
+We need to implement real-time notifications in the app using WebSocket. When a user receives a new notification (like a new message), the notification list in the header should refresh automatically without any manual refresh or polling.
+
+═══════════════════════════════════════════════════════════════
+
+🔌 SOCKET CONNECTION DETAILS:
+
+Namespace: /notifications
+URL: http://localhost:3000/notifications (Development)
+Authentication: Pass JWT token in auth object
+
+Example:
+```javascript
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:3000/notifications', {
+  auth: { token: yourJWTToken }
+});
+```
+
+═══════════════════════════════════════════════════════════════
+
+🎯 MAIN REQUIREMENT:
+
+Listen to the `newNotification` event and refresh the notification list when it fires.
+
+```javascript
+socket.on('newNotification', (data) => {
+  // 1. Refresh notification list in header
+  refreshNotificationList();
+  
+  // 2. Update notification badge count
+  updateBadgeCount();
+  
+  // 3. Optional: Show toast notification
+  showToast(data.notification.title, data.notification.message);
+});
+```
+
+═══════════════════════════════════════════════════════════════
+
+📦 NOTIFICATION DATA STRUCTURE:
+
+```javascript
+{
+  notification: {
+    id: number,
+    userId: number,
+    title: string,           // "New Message"
+    message: string,         // "You have a new message from John Doe"
+    module: string,          // 'message', 'product', 'order', etc.
+    resourceId: number,      // Related resource ID (sender userId for messages)
+    payload: {               // Additional data
+      chatId: number,
+      senderId: number,
+      senderName: string,
+      messageContent: string,
+      productId: number
+    },
+    isRead: boolean,
+    createdAt: string,
+    updatedAt: string
+  },
+  timestamp: string
+}
+```
+
+═══════════════════════════════════════════════════════════════
+
+✅ IMPLEMENTATION CHECKLIST:
+
+1. Install socket.io-client: npm install socket.io-client
+2. Connect to /notifications namespace on user login with JWT token
+3. Listen to 'newNotification' event
+4. When event received:
+   - Refresh notification list from API
+   - Update badge count in header
+   - Optionally show toast/sound notification
+5. Disconnect socket on user logout
+6. Handle reconnection automatically (Socket.IO does this by default)
+
+═══════════════════════════════════════════════════════════════
+
+📋 REST API ENDPOINTS (for reference):
+
+GET /api/notifications?page=1&limit=20  (Get notifications list)
+GET /api/notifications/unread-count      (Get unread count)
+PATCH /api/notifications/:id/read        (Mark as read)
+PATCH /api/notifications/mark-all-read   (Mark all as read)
+
+═══════════════════════════════════════════════════════════════
+
+🎨 EXPECTED UI BEHAVIOR:
+
+1. Show notification bell icon in header
+2. Display unread count badge on bell icon
+3. When new notification arrives:
+   - Badge count updates automatically
+   - Notification list refreshes automatically
+   - Optional: Show toast popup with notification details
+4. Click notification → Mark as read and navigate to relevant page
+5. "Mark all as read" button in dropdown
+
+═══════════════════════════════════════════════════════════════
+
+📚 DETAILED DOCUMENTATION:
+
+For complete implementation guide with code examples, see:
+- FRONTEND_NOTIFICATION_IMPLEMENTATION_PROMPT.md (Full guide with React examples)
+- NOTIFICATIONS_WEBSOCKET_DOCUMENTATION.md (Complete WebSocket documentation)
+- NOTIFICATIONS_SOCKET_QUICK_REFERENCE.md (Quick reference)
+
+═══════════════════════════════════════════════════════════════
+
+🧪 TESTING:
+
+1. Login as User A
+2. Send a message to User A from another account
+3. User A should see:
+   - Notification badge count increases
+   - Notification appears in list automatically
+   - Optional: Toast notification appears
+4. Click notification → Should navigate and mark as read
+5. Test across multiple tabs (both should receive notification)
+
+═══════════════════════════════════════════════════════════════
+
+⚠️ IMPORTANT NOTES:
+
+- Socket ONLY sends notifications to the specific logged-in user
+- User A will NOT receive User B's notifications
+- Each user receives ONLY their own notifications in real-time
+- No polling needed - everything is real-time via WebSocket
+- Socket automatically reconnects on connection loss
+
+═══════════════════════════════════════════════════════════════
+
+🚀 PRIORITY: High
+📅 TIMELINE: [Add your timeline]
+
+Questions? Check the documentation files or reach out to the backend team.
+
+Let me know when this is implemented so we can test together!
+

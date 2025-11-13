@@ -3,12 +3,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
+import { GetAuthenticatedProductsDto } from './dto/get-authenticated-products.dto';
+import { ReportProductDto } from './dto/report-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { DefaultResponseDto } from '../common/dto';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { UserRole } from '@common/enums';
 
 @ApiTags('Products')
 @Controller('products')
@@ -141,6 +144,45 @@ export class ProductsController {
       productId,
       updateProductStatusDto.status,
       req?.user?.id,
+    );
+
+    return new DefaultResponseDto(
+      'Product status updated successfully',
+      true,
+      product,
+    );
+  }
+
+  @Patch(':id/admin/status')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Update product status',
+    description: 'Updates the status of a product. Only the product owner can update the status.'
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Product ID' })
+  async updateProductStatusByAdmin(
+    @Param('id') id: string,
+    @Body() updateProductStatusDto: UpdateProductStatusDto,
+    @Request() req: any,
+  ) {
+    const productId = Number.parseInt(id);
+    
+    if (Number.isNaN(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
+
+    if (!req?.user?.id) {
+      throw new UnauthorizedException('User not authenticated or user ID missing');
+    }
+
+    const role = req?.user?.role;
+    console.log("role 1", role);
+    const product = await this.productsService.updateProductStatus(
+      productId,
+      updateProductStatusDto.status,
+      req?.user?.id,
+      role,
     );
 
     return new DefaultResponseDto(
@@ -396,6 +438,91 @@ export class ProductsController {
       'Product deleted successfully',
       true,
       null,
+    );
+  }
+
+  @Get('authenticated/listing')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Get authenticated product listing with filters (requires authentication)',
+    description: 'Returns a paginated list of active products with optional filters for category, keyword search, and sorting. Includes user data for each product.'
+  })
+  @ApiQuery({ name: 'categoryId', required: false, type: Number, description: 'Filter by category ID' })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['createdAt', 'name', 'price'], description: 'Sort by field (default: createdAt)' })
+  @ApiQuery({ name: 'order', required: false, enum: ['ASC', 'DESC'], description: 'Sort order (default: DESC)' })
+  @ApiQuery({ name: 'keyword', required: false, type: String, description: 'Search keyword for product name' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  async getAuthenticatedProducts(
+    @Query() getAuthenticatedProductsDto: GetAuthenticatedProductsDto,
+    @Request() req: any,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const result = await this.productsService.getAuthenticatedProducts(getAuthenticatedProductsDto);
+    return new DefaultResponseDto(
+      'Products retrieved successfully',
+      true,
+      result,
+    );
+  }
+
+  @Post('report')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Report a product (requires authentication)',
+    description: 'Allows a user to report a product. Each user can only report a product once.'
+  })
+  async reportProduct(
+    @Body() reportProductDto: ReportProductDto,
+    @Request() req: any,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const userId = req.user.id;
+    const report = await this.productsService.reportProduct(reportProductDto, userId);
+    
+    return new DefaultResponseDto(
+      'Product reported successfully',
+      true,
+      report,
+    );
+  }
+
+  @Get(':productId/reports')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Get all reports for a product (requires authentication)',
+    description: 'Returns all reports for a specific product with reporter user details, sorted by createdAt DESC.'
+  })
+  @ApiParam({ name: 'productId', type: Number, description: 'Product ID' })
+  async getProductReports(
+    @Param('productId') productId: string,
+    @Request() req: any,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const id = Number.parseInt(productId, 10);
+
+    if (Number.isNaN(id)) {
+      throw new BadRequestException('Invalid product ID');
+    }
+
+    const result = await this.productsService.getProductReports(id);
+    
+    return new DefaultResponseDto(
+      'Product reports retrieved successfully',
+      true,
+      result,
     );
   }
 

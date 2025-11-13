@@ -9,6 +9,7 @@ import { Chat } from '../entities/chat.entity';
 import { Message } from '../entities/message.entity';
 import { Product } from '../entities/product.entity';
 import { User } from '../entities/user.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { User } from '../entities/user.entity';
       }),
       inject: [ConfigService],
     }),
+    NotificationsModule,
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway],

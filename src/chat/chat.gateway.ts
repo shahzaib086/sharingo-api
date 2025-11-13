@@ -12,6 +12,9 @@ import { ChatService } from './chat.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { JwtService } from '@nestjs/jwt';
 import { Logger, UnauthorizedException } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { NotificationModule } from '../entities/notification.entity';
 
 interface AuthenticatedSocket extends Socket {
   userId?: number;
@@ -29,11 +32,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
-  private userSockets: Map<number, Set<string>> = new Map();
+  private readonly userSockets: Map<number, Set<string>> = new Map();
 
   constructor(
     private readonly chatService: ChatService,
     private readonly jwtService: JwtService,
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -116,7 +121,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // Save message using service
-      const message = await this.chatService.sendMessage(data, client.userId);
+      const message = await this.chatService.sendMessage(data, client.userId, false);
 
       // Get chat details to find the recipient
       const chat = await this.chatService.getChatById(
@@ -152,6 +157,67 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         lastMessage: message.content.substring(0, 100),
         lastMessageAt: new Date(),
       });
+
+      // Create in-app notification and send push notification to recipient
+      try {
+        // Get sender info from message (eager loaded)
+        const sender = message.sender;
+        const senderName = sender 
+          ? `${sender.firstName} ${sender.lastName}`.trim() 
+          : 'Someone';
+        
+        // Get product info from chat
+        const product = chat.product;
+        const productName = product?.name || 'a product';
+
+        // Create in-app notification
+        await this.notificationsService.createNotification({
+          userId: recipientId,
+          title: 'New Message',
+          message: `You have a new message from ${senderName}`,
+          module: NotificationModule.MESSAGE,
+          resourceId: client.userId, // sender's userId
+          payload: {
+            chatId: data.chatId,
+            senderId: client.userId,
+            senderName,
+            messageContent: message.content.substring(0, 100),
+            productId: chat.productId,
+          },
+        });
+
+        // Prepare push notification title and body
+        const notificationTitle = `${senderName}`;
+        const notificationBody = message.content;
+
+        // Prepare push notification data payload
+        const notificationData = {
+          type: 'message',
+          chatId: data.chatId.toString(),
+          senderId: client.userId.toString(),
+          senderName,
+          productId: chat.productId.toString(),
+          productName,
+          messageId: message.id.toString(),
+        };
+
+        // Send push notification to recipient (don't wait for it)
+        this.notificationsService
+          .sendPushNotificationToUser(
+            recipientId,
+            notificationTitle,
+            notificationBody,
+            notificationData,
+          )
+          .catch((error) => {
+            this.logger.error(`Error sending push notification: ${error.message}`);
+          });
+      } catch (notificationError) {
+        // Log error but don't fail the message send
+        this.logger.error(
+          `Error with notifications: ${notificationError.message}`,
+        );
+      }
 
       return { success: true, message };
     } catch (error) {

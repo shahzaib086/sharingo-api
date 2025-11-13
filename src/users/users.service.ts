@@ -2,13 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
+import { Address } from '../entities/address.entity';
 import { OnboardingStep } from '../common/enums/user.enum';
+import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Address)
+    private readonly addressRepository: Repository<Address>,
   ) {}
 
   async findAll(): Promise<User[]> {
@@ -69,6 +73,77 @@ export class UsersService {
 
   async remove(id: number): Promise<void> {
     await this.usersRepository.delete(id);
+  }
+
+  async updateProfile(
+    userId: number,
+    updateUserProfileDto: UpdateUserProfileDto,
+  ): Promise<User> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Update user fields
+    if (updateUserProfileDto.firstName !== undefined) {
+      user.firstName = updateUserProfileDto.firstName;
+    }
+    if (updateUserProfileDto.lastName !== undefined) {
+      user.lastName = updateUserProfileDto.lastName;
+    }
+    if (updateUserProfileDto.countryCode !== undefined) {
+      user.countryCode = updateUserProfileDto.countryCode;
+    }
+    if (updateUserProfileDto.phoneNumber !== undefined) {
+      user.phoneNumber = updateUserProfileDto.phoneNumber;
+    }
+
+    return await this.usersRepository.save(user);
+  }
+
+  async getUserWithAddress(userId: number): Promise<any> {
+    const user = await this.usersRepository.findOne({ 
+      where: { id: userId },
+      select: [
+        'id',
+        'firstName',
+        'lastName',
+        'name',
+        'email',
+        'countryCode',
+        'phoneNumber',
+        'gender',
+        'status',
+        'image',
+        'onboardingStep',
+        'isEmailVerified',
+        'isPhoneVerified',
+        'role',
+        'createdAt',
+        'updatedAt',
+      ]
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Get default address or first address
+    let address = await this.addressRepository.findOne({
+      where: { userId, isDefault: true },
+    });
+
+    // If no default address, get the first address
+    address ??= await this.addressRepository.findOne({
+      where: { userId },
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      user,
+      address: address || null,
+    };
   }
 
 }

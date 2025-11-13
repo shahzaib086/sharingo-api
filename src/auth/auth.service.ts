@@ -26,6 +26,7 @@ type SignInData = {
   email: string;
   firstName: string;
   lastName: string;
+  role: string;
 };
 
 type AuthUserResponse = {
@@ -33,6 +34,7 @@ type AuthUserResponse = {
   firstName: string;
   lastName: string;
   email: string;
+  role: string;
 };
 
 type AuthResponse = {
@@ -95,6 +97,7 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      role: user.role,
     };
 
     return signInData;
@@ -109,6 +112,7 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        role: user.role,
       }
     };
   }
@@ -158,6 +162,7 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role,
       };
 
       return await this.signIn(signInData);
@@ -214,6 +219,7 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      role: user.role,
     };
 
     return await this.signIn(signInData);

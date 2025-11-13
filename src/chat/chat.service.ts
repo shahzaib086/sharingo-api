@@ -14,6 +14,8 @@ import { InitiateChatDto } from './dto/initiate-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { GetChatHeadsDto } from './dto/get-chat-heads.dto';
 import { GetMessagesDto } from './dto/get-messages.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationModule } from '../entities/notification.entity';
 
 @Injectable()
 export class ChatService {
@@ -26,6 +28,7 @@ export class ChatService {
     private readonly productRepository: Repository<Product>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -167,8 +170,11 @@ export class ChatService {
       take: limit,
     });
 
+    // Reverse messages to return in chronological order
+    messages.reverse();
+
     return {
-      messages: messages.reverse(), // Return in chronological order
+      messages,
       total,
       page,
       limit,
@@ -182,6 +188,7 @@ export class ChatService {
   async sendMessage(
     sendMessageDto: SendMessageDto,
     userId: number,
+    createInAppNotification: boolean = true,
   ): Promise<Message> {
     const { chatId, content } = sendMessageDto;
 
@@ -227,6 +234,35 @@ export class ChatService {
 
     if (!messageWithSender) {
       throw new NotFoundException('Message not found after saving');
+    }
+
+    // Create in-app notification for recipient
+    try {
+      if (createInAppNotification) {
+        const recipientId = userId === chat.userAId ? chat.userBId : chat.userAId;
+        const sender = messageWithSender.sender;
+        const senderName = sender 
+          ? `${sender.firstName} ${sender.lastName}`.trim() 
+          : 'Someone';
+
+        await this.notificationsService.createNotification({
+          userId: recipientId,
+          title: 'New Message',
+          message: `You have a new message from ${senderName}`,
+          module: NotificationModule.MESSAGE,
+          resourceId: userId, // sender's userId
+          payload: {
+            chatId,
+            senderId: userId,
+            senderName,
+            messageContent: content.substring(0, 100),
+            productId: chat.productId,
+          },
+        });
+      }
+    } catch (notificationError) {
+      // Log error but don't fail the message send
+      console.error('Error creating in-app notification:', notificationError);
     }
 
     return messageWithSender;

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
@@ -8,12 +8,15 @@ import { ProductCategory } from '../entities/product-category.entity';
 import { ProductMedia, MediaType } from '../entities/product-media.entity';
 import { Chat } from '../entities/chat.entity';
 import { User } from '../entities/user.entity';
+import { ProductReport } from '../entities/product-report.entity';
 import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
+import { GetAuthenticatedProductsDto } from './dto/get-authenticated-products.dto';
+import { ReportProductDto } from './dto/report-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
-import { ProductStatus, ChatStatus } from '@common/enums';
+import { ProductStatus, ChatStatus, UserRole } from '@common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class ProductsService {
@@ -28,6 +31,8 @@ export class ProductsService {
     private readonly chatRepository: Repository<Chat>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(ProductReport)
+    private readonly productReportRepository: Repository<ProductReport>,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -716,7 +721,7 @@ export class ProductsService {
     await this.productsRepository.softRemove(product);
   }
 
-  async updateProductStatus(id: number, status: number, requestUserId: number): Promise<Product> {
+  async updateProductStatus(id: number, status: number, requestUserId: number, role: UserRole = UserRole.USER): Promise<Product> {
     // Find product
     const product = await this.productsRepository.findOne({ 
       where: { id },
@@ -726,9 +731,9 @@ export class ProductsService {
     if (!product) {
       throw new NotFoundException('Product not found');
     }
-
+    console.log("role", role);
     // Verify the requesting user owns the product or is the user associated with the product
-    if (product.userId !== requestUserId) {
+    if (role === UserRole.USER && product.userId !== requestUserId) {
       throw new NotFoundException('Product not found or you do not have permission to update this product');
     }
 
@@ -805,6 +810,212 @@ export class ProductsService {
       incremented: true, 
       productId: updatedProduct!.id, 
       views: updatedProduct!.views 
+    };
+  }
+
+  async getAuthenticatedProducts(
+    getAuthenticatedProductsDto: GetAuthenticatedProductsDto,
+  ): Promise<{
+    products: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const {
+      categoryId,
+      sortBy = 'createdAt',
+      order = 'DESC',
+      keyword,
+      page = 1,
+      limit = 20,
+    } = getAuthenticatedProductsDto;
+
+    const queryBuilder = this.productsRepository
+      .createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
+      .leftJoinAndSelect('product.user', 'user')
+      .select([
+        'product.id',
+        'product.name',
+        'product.nameSlug',
+        'product.categoryId',
+        'product.addressId',
+        'product.userId',
+        'product.price',
+        'product.description',
+        'product.status',
+        'product.views',
+        'product.tags',
+        'product.createdAt',
+        'product.updatedAt',
+        'category.id',
+        'category.name',
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.email',
+        'user.image',
+      ])
+      // .where('product.status = :status', { status: ProductStatus.ACTIVE });
+
+    // Apply category filter
+    if (categoryId) {
+      queryBuilder.andWhere('product.categoryId = :categoryId', { categoryId });
+    }
+
+    // Apply keyword search on product name
+    if (keyword) {
+      queryBuilder.andWhere('product.name ILIKE :keyword', {
+        keyword: `%${keyword}%`,
+      });
+    }
+
+    // Apply sorting
+    queryBuilder.orderBy(`product.${sortBy}`, order);
+
+    // Get total count for pagination
+    const total = await queryBuilder.getCount();
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    queryBuilder.skip(skip).take(limit);
+
+    const products = await queryBuilder.getMany();
+
+    // Fetch media for all products in one query
+    const productIds = products.map((p) => p.id);
+    const allMedia =
+      productIds.length > 0
+        ? await this.productMediaRepository
+            .createQueryBuilder('media')
+            .where('media.productId IN (:...productIds)', { productIds })
+            .orderBy('media.sequence', 'ASC')
+            .getMany()
+        : [];
+
+    // Group media by productId
+    const mediaByProduct = allMedia.reduce((acc, media) => {
+      if (!acc[media.productId]) {
+        acc[media.productId] = [];
+      }
+      acc[media.productId].push(media);
+      return acc;
+    }, {} as Record<number, ProductMedia[]>);
+
+    // Fetch report counts for all products
+    const reportCounts =
+      productIds.length > 0
+        ? await this.productReportRepository
+            .createQueryBuilder('report')
+            .select('report.productId', 'productId')
+            .addSelect('COUNT(report.id)', 'count')
+            .where('report.productId IN (:...productIds)', { productIds })
+            .groupBy('report.productId')
+            .getRawMany()
+        : [];
+
+    // Create a map of productId to report count
+    const reportCountByProduct = reportCounts.reduce((acc, item) => {
+      acc[item.productId] = parseInt(item.count, 10);
+      return acc;
+    }, {} as Record<number, number>);
+
+    // Add media and report count to each product
+    const productsWithMedia = products.map((product) => ({
+      ...product,
+      media: mediaByProduct[product.id] || [],
+      reportsCount: reportCountByProduct[product.id] || 0,
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      products: productsWithMedia,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  async reportProduct(
+    reportProductDto: ReportProductDto,
+    userId: number,
+  ): Promise<ProductReport> {
+    const { productId, message } = reportProductDto;
+
+    // Check if product exists
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Check if user has already reported this product
+    const existingReport = await this.productReportRepository.findOne({
+      where: {
+        reportedUserId: userId,
+        productId,
+      },
+    });
+
+    if (existingReport) {
+      throw new BadRequestException('You already reported this product');
+    }
+
+    // Create new report
+    const report = this.productReportRepository.create({
+      reportedUserId: userId,
+      productId,
+      message,
+    });
+
+    return await this.productReportRepository.save(report);
+  }
+
+  async getProductReports(
+    productId: number,
+  ): Promise<{
+    reports: ProductReport[];
+    total: number;
+  }> {
+    // Check if product exists
+    const product = await this.productsRepository.findOne({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Build query - get all reports with user details
+    const reports = await this.productReportRepository
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedUser', 'user')
+      .select([
+        'report.id',
+        'report.reportedUserId',
+        'report.productId',
+        'report.message',
+        'report.createdAt',
+        'report.updatedAt',
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.email',
+      ])
+      .where('report.productId = :productId', { productId })
+      .orderBy('report.createdAt', 'DESC')
+      .getMany();
+
+    const total = reports.length;
+
+    return {
+      reports,
+      total,
     };
   }
 
