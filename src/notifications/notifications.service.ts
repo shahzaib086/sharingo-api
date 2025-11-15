@@ -195,6 +195,29 @@ export class NotificationsService {
     return await this.userTokenRepository.find();
   }
 
+  async notifyAndCreateNotification(
+    userId: number,
+    title: string,
+    message: string,
+    module: NotificationModule,
+    resourceId: number,
+    payload: any,
+  ): Promise<Notification> {
+    const notification = await this.createNotification({
+      userId,
+      title,
+      message,
+      module,
+      resourceId,
+      payload,
+    });
+
+    // Send push notification to the user
+    await this.sendPushNotificationToUser(userId, title, message, payload);
+    await this.notificationsGateway.emitNewNotification(userId, notification);
+
+    return notification;
+  }
   async notifyAllUsersAboutNewProduct(
     product: any,
     productOwner: any,

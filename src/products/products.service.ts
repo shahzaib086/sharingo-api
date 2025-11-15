@@ -13,10 +13,12 @@ import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { GetAuthenticatedProductsDto } from './dto/get-authenticated-products.dto';
 import { ReportProductDto } from './dto/report-product.dto';
+import { GetReportsDto } from './dto/get-reports.dto';
+import { UpdateReportDto } from './dto/update-report.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductImagesDto } from './dto/update-product-images.dto';
-import { ProductStatus, ChatStatus, UserRole } from '@common/enums';
+import { ProductStatus, ChatStatus, UserRole, NotificationModule } from '@common/enums';
 import { NotificationsService } from '../notifications/notifications.service';
 @Injectable()
 export class ProductsService {
@@ -1000,6 +1002,8 @@ export class ProductsService {
         'report.reportedUserId',
         'report.productId',
         'report.message',
+        'report.status',
+        'report.notes',
         'report.createdAt',
         'report.updatedAt',
         'user.id',
@@ -1017,6 +1021,145 @@ export class ProductsService {
       reports,
       total,
     };
+  }
+
+  async getReports(
+    getReportsDto: GetReportsDto,
+  ): Promise<{
+    reports: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    pendingReportsCount: number;
+    resolvedReportsCount: number;
+  }> {
+    const { page = 1, limit = 10, status } = getReportsDto;
+
+    // Build query - get all reports with user and product details
+    const queryBuilder = this.productReportRepository
+      .createQueryBuilder('report')
+      .leftJoinAndSelect('report.reportedUser', 'user')
+      .leftJoinAndSelect('report.product', 'product')
+      .select([
+        'report.id',
+        'report.reportedUserId',
+        'report.productId',
+        'report.message',
+        'report.status',
+        'report.notes',
+        'report.createdAt',
+        'report.updatedAt',
+        'user.id',
+        'user.firstName',
+        'user.lastName',
+        'user.email',
+        'user.image',
+        'product.id',
+        'product.name',
+        'product.nameSlug',
+        'product.image',
+        'product.price',
+        'product.status',
+      ])
+      .orderBy('report.createdAt', 'DESC');
+
+    // Apply status filter if provided
+    if (status !== undefined) {
+      queryBuilder.andWhere('report.status = :status', { status });
+    }
+
+    // Get total count for pagination
+    const total = await queryBuilder.getCount();
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    queryBuilder.skip(skip).take(limit);
+
+    const reports = await queryBuilder.getMany();
+
+    // Format the response to include user and product data
+    const formattedReports = reports.map((report) => ({
+      id: report.id,
+      message: report.message,
+      status: report.status,
+      notes: report.notes,
+      createdAt: report.createdAt,
+      updatedAt: report.updatedAt,
+      user: {
+        id: report.reportedUser?.id,
+        firstName: report.reportedUser?.firstName,
+        lastName: report.reportedUser?.lastName,
+        email: report.reportedUser?.email,
+        image: report.reportedUser?.image,
+      },
+      product: {
+        id: report.product?.id,
+        name: report.product?.name,
+        nameSlug: report.product?.nameSlug,
+        image: report.product?.image,
+        price: report.product?.price,
+        status: report.product?.status,
+      },
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    // return pending and completed reports count
+    const pendingReportsCount = await this.productReportRepository.count({
+      where: { status: 0 },
+    });
+    const resolvedReportsCount = await this.productReportRepository.count({
+      where: { status: 1 },
+    });
+
+    return {
+      reports: formattedReports,
+      total,
+      page,
+      limit,
+      totalPages,
+      pendingReportsCount,
+      resolvedReportsCount,
+    };
+  }
+
+  async updateReport(
+    reportId: number,
+    updateReportDto: UpdateReportDto,
+  ): Promise<ProductReport> {
+    const report = await this.productReportRepository.findOne({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new NotFoundException('Report not found');
+    }
+
+    // Update only provided fields
+    if (updateReportDto.status !== undefined) {
+      report.status = updateReportDto.status;
+      // notify the user about the report status change
+      if(updateReportDto.status === 1) {
+        await this.notificationsService.notifyAndCreateNotification(
+          report.reportedUserId,
+          'Report resolved',
+          'Your report has been resolved',
+          NotificationModule.REPORT,
+          report.id,
+          {
+            reportId: report.id,
+            reportStatus: updateReportDto.status,
+          }
+        );
+      }
+    }
+
+    if (updateReportDto.notes !== undefined) {
+      report.notes = updateReportDto.notes;
+    }
+
+    return await this.productReportRepository.save(report);
   }
 
 } 

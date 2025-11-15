@@ -15,6 +15,7 @@ export enum NotificationModule {
   VIDEO = 'video',
   MESSAGE = 'message',
   GENERAL = 'general',
+  REPORT = 'report',
 }
 
 @Entity('notifications')

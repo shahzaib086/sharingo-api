@@ -5,13 +5,14 @@ import { GetProductsDto } from './dto/get-products.dto';
 import { GetPublicProductsDto } from './dto/get-public-products.dto';
 import { GetAuthenticatedProductsDto } from './dto/get-authenticated-products.dto';
 import { ReportProductDto } from './dto/report-product.dto';
+import { GetReportsDto } from './dto/get-reports.dto';
+import { UpdateReportDto } from './dto/update-report.dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { UpdateProductStatusDto } from './dto/update-product-status.dto';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { DefaultResponseDto } from '../common/dto';
+import { DefaultResponseDto } from '@common/dto';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiConsumes, ApiBody } from '@nestjs/swagger';
-import { UserRole } from '@common/enums';
 
 @ApiTags('Products')
 @Controller('products')
@@ -189,6 +190,68 @@ export class ProductsController {
       'Product status updated successfully',
       true,
       product,
+    );
+  }
+
+  @Get('admin/reports')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Get all reports with pagination (requires authentication)',
+    description: 'Returns a paginated list of all product reports with user and product data, sorted by createdAt DESC. Optionally filter by status (0: Pending, 1: Completed).'
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of reports per page (default: 10)' })
+  @ApiQuery({ name: 'status', required: false, type: Number, description: 'Filter by status (0: Pending, 1: Completed)' })
+  async getReports(
+    @Query() getReportsDto: GetReportsDto,
+    @Request() req: any,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const result = await this.productsService.getReports(getReportsDto);
+    
+    return new DefaultResponseDto(
+      'Reports retrieved successfully',
+      true,
+      result,
+    );
+  }
+
+  @Patch('admin/reports/:id')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard)
+  @ApiOperation({ 
+    summary: 'Update report status and notes (requires authentication)',
+    description: 'Updates the status and/or notes of a product report. Status: 0 = Pending, 1 = Completed.'
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Report ID' })
+  async updateReport(
+    @Param('id') id: string,
+    @Body() updateReportDto: UpdateReportDto,
+    @Request() req: any,
+  ) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const reportId = Number.parseInt(id, 10);
+
+    if (Number.isNaN(reportId)) {
+      throw new BadRequestException('Invalid report ID');
+    }
+
+    const report = await this.productsService.updateReport(
+      reportId,
+      updateReportDto,
+    );
+    
+    return new DefaultResponseDto(
+      'Report updated successfully',
+      true,
+      report,
     );
   }
 
@@ -494,6 +557,8 @@ export class ProductsController {
       report,
     );
   }
+
+  
 
   @Get(':productId/reports')
   @ApiBearerAuth()

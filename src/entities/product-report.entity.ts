@@ -34,6 +34,12 @@ export class ProductReport {
   @Column({ type: 'text', nullable: true })
   message: string;
 
+  @Column({ type: 'int', default: 0 })
+  status: number;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
